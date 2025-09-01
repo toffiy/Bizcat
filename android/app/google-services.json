@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "956060768236",
+    "project_id": "bizcat-f3d7a",
+    "storage_bucket": "bizcat-f3d7a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:956060768236:android:5415267e19bc8322f152c9",
+        "android_client_info": {
+          "package_name": "com.example.bizcat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBncKzwRwhgpwQNVQMwgE9O8Ii-sq2nCUs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
