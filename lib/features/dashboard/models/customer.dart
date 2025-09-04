@@ -6,6 +6,7 @@ class Customer {
   final String email;
   final String address;
   final String phone;
+  final String photoUrl; // ✅ new field
 
   const Customer({
     required this.id,
@@ -14,6 +15,7 @@ class Customer {
     required this.email,
     required this.address,
     required this.phone,
+    required this.photoUrl, // ✅ include in constructor
   });
 
   factory Customer.fromMap(String id, Map<String, dynamic> map) {
@@ -24,6 +26,7 @@ class Customer {
       email:     (map['email']     ?? '').toString(),
       address:   (map['address']   ?? '').toString(),
       phone:     (map['phone']     ?? '').toString(),
+      photoUrl:  (map['photoUrl']  ?? map['buyerPhotoURL'] ?? '').toString(), 
     );
   }
 }

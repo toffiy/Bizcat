@@ -128,7 +128,7 @@ class _LiveControlPageState extends State<LiveControlPage> {
                                 ? Image.network(
                                     p.imageUrl,
                                     width: double.infinity,
-                                    height: 160, // Bigger image
+                                    height: 160,
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) =>
                                         const Icon(Icons.broken_image, size: 40),
@@ -193,20 +193,21 @@ class _LiveControlPageState extends State<LiveControlPage> {
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: !isLive
+                                    backgroundColor: (!isLive && inStock)
                                         ? Colors.blue
                                         : Colors.grey.shade400,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    shadowColor: !isLive
+                                    shadowColor: (!isLive && inStock)
                                         ? Colors.blueAccent
                                         : Colors.transparent,
-                                    elevation: !isLive ? 6 : 0,
+                                    elevation: (!isLive && inStock) ? 6 : 0,
                                   ),
-                                  onPressed:
-                                      !isLive ? () => _showNow(p) : null,
+                                  onPressed: (!isLive && inStock)
+                                      ? () => _showNow(p)
+                                      : null,
                                   child: const Text("Show"),
                                 ),
                               ),

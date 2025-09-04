@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// Existing pages
 import 'features/auth/presentation/login_page.dart';
 import 'features/auth/presentation/register_page.dart';
 import 'features/dashboard/presentation/dashboard_page.dart';
+
+// NEW pages for Google Sign-In flow
+import 'features/auth/presentation/create_password.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,15 +25,15 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'BizCat',
       theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white, // whole app background
+        scaffoldBackgroundColor: Colors.white,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white, // white app bar
+          backgroundColor: Colors.white,
           elevation: 0,
-          foregroundColor: Colors.black, // black text/icons
+          foregroundColor: Colors.black,
         ),
         colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: Colors.black, // primary accent color
-          secondary: Colors.grey[800], // secondary accent
+          primary: Colors.black,
+          secondary: Colors.grey[800],
         ),
         textTheme: const TextTheme(
           bodyLarge: TextStyle(color: Colors.black),
@@ -42,6 +46,9 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/dashboard': (context) => DashboardPage(),
+
+        // NEW routes
+        '/create-password': (context) => const CreatePasswordPage(),
       },
     );
   }

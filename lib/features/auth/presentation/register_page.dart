@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/colors.dart';
 import '../Services/auth_service.dart';
-import 'login_page.dart';
+import '../Services/user_checker.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -15,33 +15,65 @@ class _RegisterPageState extends State<RegisterPage> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
-  String _message = "";
 
-  void _register() async {
-    if (_firstNameController.text.trim().isEmpty ||
-        _lastNameController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
+  final AuthService _authService = AuthService();
+  final UserChecker _userChecker = UserChecker();
+
+  String _message = "";
+  bool _isLoading = false;
+
+  Future<void> _register() async {
+    setState(() => _message = "");
+
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    // Local validation
+    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty || password.isEmpty) {
       setState(() => _message = "Please fill in all fields.");
       return;
     }
 
+    if (!_authService.isValidEmail(email)) {
+      setState(() => _message = "Invalid email format.");
+      return;
+    }
+
+    final passError = _authService.passwordStrengthMessage(password);
+    if (passError != null) {
+      setState(() => _message = passError);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // Check Firestore for duplicate email
+    if (await _userChecker.emailExists(email)) {
+      setState(() {
+        _message = "This email is already registered.";
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Register in Firebase Auth + Firestore
     final error = await _authService.registerSeller(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
+      email: email,
+      password: password,
+      firstName: firstName,
+      lastName: lastName,
     );
 
     if (error != null) {
-      setState(() => _message = error);
+      setState(() {
+        _message = error;
+        _isLoading = false;
+      });
     } else {
-      setState(() => _message = "Account created successfully ✅");
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
+      setState(() => _isLoading = false);
+      Navigator.pushReplacementNamed(context, '/dashboard');
     }
   }
 
@@ -146,29 +178,30 @@ class _RegisterPageState extends State<RegisterPage> {
                                   width: double.infinity,
                                   height: 50,
                                   child: ElevatedButton(
-                                    onPressed: _register,
+                                    onPressed: _isLoading ? null : _register,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.blue,
                                       shape: RoundedRectangleBorder(
                                           borderRadius:
                                               BorderRadius.circular(12)),
                                     ),
-                                    child: const Text(
-                                      "Register",
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold),
-                                    ),
+                                    child: _isLoading
+                                        ? const CircularProgressIndicator(
+                                            color: Colors.white,
+                                          )
+                                        : const Text(
+                                            "Register",
+                                            style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 15),
                                 TextButton(
                                   onPressed: () {
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => const LoginPage()),
-                                    );
+                                    Navigator.pushReplacementNamed(
+                                        context, '/login');
                                   },
                                   child: Text(
                                     "Already have an account? Login",
@@ -178,8 +211,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                 const SizedBox(height: 10),
                                 Text(
                                   _message,
-                                  style: const TextStyle(
-                                    color: Colors.redAccent,
+                                  style: TextStyle(
+                                    color: _message.contains("success")
+                                        ? Colors.green
+                                        : Colors.redAccent,
                                     fontWeight: FontWeight.bold,
                                   ),
                                   textAlign: TextAlign.center,
@@ -200,3 +235,4 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
+  

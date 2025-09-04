@@ -42,9 +42,11 @@ class CustomerListPage extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final cws = customers[index];
+              final customer = cws.customer;
+
               return CustomerInfoCard(
-                customer: cws.customer,
-                initials: _initials(cws.customer),
+                customer: customer,
+                initials: _initials(customer),
                 ordersCount: cws.ordersCount,
                 totalSpent: cws.totalSpent,
                 lastOrderDate: cws.lastOrderDate,

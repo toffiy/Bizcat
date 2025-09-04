@@ -30,6 +30,7 @@ class CustomerController {
         final lastName = (data['buyerLastName'] ?? '').toString();
         final phone = (data['buyerPhone'] ?? '').toString();
         final address = (data['buyerAddress'] ?? '').toString();
+        final photoUrl = (data['buyerPhotoURL'] ?? '').toString(); // ✅ new
 
         final price = (data['price'] ?? 0) is num
             ? (data['price'] as num).toDouble()
@@ -48,6 +49,7 @@ class CustomerController {
               email: email,
               address: address,
               phone: phone,
+              photoUrl: photoUrl, // ✅ pass into model
             ),
             ordersCount: 0,
             totalSpent: 0.0,

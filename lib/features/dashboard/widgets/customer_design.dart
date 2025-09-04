@@ -21,7 +21,7 @@ class CustomerInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-       color: Colors.white,
+      color: Colors.white,
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -35,37 +35,57 @@ class CustomerInfoCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: Colors.indigo.shade100,
-                  child: Text(initials,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: Colors.indigo)),
+                  backgroundImage: customer.photoUrl.isNotEmpty
+                      ? NetworkImage(customer.photoUrl)
+                      : null, // ✅ show photo if available
+                  child: customer.photoUrl.isEmpty
+                      ? Text(
+                          initials,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.indigo,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${customer.firstName} ${customer.lastName}',
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('Customer ID: ${customer.id}',
-                          style: TextStyle(
-                              fontSize: 13, color: Colors.grey.shade600)),
+                      Text(
+                        '${customer.firstName} ${customer.lastName}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Customer ID: ${customer.id}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.green.shade100,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text('Active',
-                      style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12)),
+                  child: const Text(
+                    'Active',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -84,10 +104,12 @@ class CustomerInfoCard extends StatelessWidget {
               children: [
                 _statItem('Orders', '$ordersCount'),
                 _statItem('Total Spent', '₱${totalSpent.toStringAsFixed(2)}'),
-                _statItem('Last Order',
-                    lastOrderDate != null
-                        ? DateFormat('M/d/yyyy').format(lastOrderDate!)
-                        : '-'),
+                _statItem(
+                  'Last Order',
+                  lastOrderDate != null
+                      ? DateFormat('M/d/yyyy').format(lastOrderDate!)
+                      : '-',
+                ),
               ],
             ),
           ],
@@ -102,7 +124,12 @@ class CustomerInfoCard extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: Colors.grey.shade700),
             const SizedBox(width: 6),
-            Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
           ],
         ),
       );
@@ -110,11 +137,21 @@ class CustomerInfoCard extends StatelessWidget {
   Widget _statItem(String label, String value) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(value,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
         ],
       );
 }

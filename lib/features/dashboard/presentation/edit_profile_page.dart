@@ -104,7 +104,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         radius: 50,
                         backgroundImage: _profileImageUrl != null
                             ? NetworkImage(_profileImageUrl!)
-                            : const AssetImage('assets/default_avatar.png')
+                            : const AssetImage('lib/assets/default_avatar.png')
                                 as ImageProvider,
                       ),
                     ),
