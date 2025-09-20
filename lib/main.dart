@@ -6,14 +6,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/auth/presentation/register_page.dart';
 import 'features/dashboard/presentation/dashboard_page.dart';
-
-// NEW pages for Google Sign-In flow
 import 'features/auth/presentation/create_password.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(const MyApp());
+  
 }
 
 class MyApp extends StatelessWidget {
@@ -46,8 +45,6 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/dashboard': (context) => DashboardPage(),
-
-        // NEW routes
         '/create-password': (context) => const CreatePasswordPage(),
       },
     );

@@ -7,14 +7,21 @@ import '../controllers/order_controller.dart';
 import '../models/dash_item.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
-import '../widgets/dashboard_design.dart'; // ⬅️ Import your design file
+import '../widgets/dashboard_design.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import '../widgets/notification.dart'; // ✅ import the helper
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
   final DashboardController controller = DashboardController();
   final AuthService authService = AuthService();
   final OrderController orderController = OrderController();
-
-  DashboardPage({super.key});
 
   final String sellerId = FirebaseAuth.instance.currentUser!.uid;
 
@@ -27,10 +34,12 @@ class DashboardPage extends StatelessWidget {
     DashboardItem(title: 'Live Control', icon: Icons.live_tv),
   ];
 
+  int _previousOrderCount = 0;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F6FA),
       appBar: buildDashboardAppBar(
         context: context,
         sellerId: sellerId,
@@ -42,20 +51,27 @@ class DashboardPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(child: _buildPendingOrdersCard()),
-                const SizedBox(width: 12),
-                Expanded(child: _buildDailySalesCard()),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _buildProductsCard()),
-                const SizedBox(width: 12),
-                Expanded(child: _buildAnnualSalesCard()),
-              ],
+            StreamBuilder<List<MyOrder>>(
+              stream: orderController.getOrdersForSeller(sellerId),
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  final orders = snapshot.data!;
+                  if (_previousOrderCount != 0 &&
+                      orders.length > _previousOrderCount) {
+                    final newOrder = orders.first;
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      TopNotification.show(
+                        context,
+                        ' New order from ${newOrder.buyerFirstName}',
+                        backgroundColor: Colors.green.shade600,
+                      );
+                    });
+                  }
+                  _previousOrderCount = orders.length;
+                }
+                return _buildStatsGrid(context);
+              },
             ),
             const SizedBox(height: 24),
             const Text(
@@ -81,6 +97,25 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
+  Widget _buildStatsGrid(BuildContext context) {
+    return GridView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.8,
+      ),
+      children: [
+        _buildAnnualSalesCard(),
+        _buildDailySalesCard(),
+        _buildPendingOrdersCard(),
+        _buildProductsCard(),
+      ],
+    );
+  }
+
   Widget _buildPendingOrdersCard() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -89,23 +124,16 @@ class DashboardPage extends StatelessWidget {
           .collection('orders')
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const StatCard(
-            title: 'Pending Orders',
-            value: '—',
-            icon: Icons.hourglass_empty,
-            iconColor: Colors.orange,
-          );
-        }
-        final allOrders = snapshot.data?.docs ?? [];
-        final pendingOrders = allOrders.where((doc) {
-          final status = (doc['status'] ?? '').toString().trim().toLowerCase();
-          return status == 'pending';
-        }).toList();
-
+        final count = snapshot.hasData
+            ? snapshot.data!.docs
+                .where((doc) =>
+                    (doc['status'] ?? '').toString().trim().toLowerCase() ==
+                    'pending')
+                .length
+            : 0;
         return StatCard(
           title: 'Pending Orders',
-          value: '${pendingOrders.length}',
+          value: '$count',
           icon: Icons.hourglass_empty,
           iconColor: Colors.orange,
         );
@@ -121,9 +149,10 @@ class DashboardPage extends StatelessWidget {
         final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
         if (snapshot.hasData) {
           for (var order in snapshot.data!) {
-            final orderDate =
-                DateFormat('yyyy-MM-dd').format(order.timestamp);
-            if (orderDate == today) {
+            final dateTime = order.timestamp is Timestamp
+                ? (order.timestamp as Timestamp).toDate()
+                : order.timestamp as DateTime;
+            if (DateFormat('yyyy-MM-dd').format(dateTime) == today) {
               total += order.totalAmount;
             }
           }
@@ -165,7 +194,10 @@ class DashboardPage extends StatelessWidget {
         final currentYear = DateTime.now().year;
         if (snapshot.hasData) {
           for (var order in snapshot.data!) {
-            if (order.timestamp.year == currentYear) {
+            final dateTime = order.timestamp is Timestamp
+                ? (order.timestamp as Timestamp).toDate()
+                : order.timestamp as DateTime;
+            if (dateTime.year == currentYear) {
               total += order.totalAmount;
             }
           }

@@ -41,6 +41,35 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
     }
   }
 
+  /// 🔹 Confirmation dialog before status change
+  void _confirmStatusChange(String orderId, String newStatus) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Action'),
+          content: Text(
+            'Are you sure you want to mark this order as "$newStatus"?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
+              onPressed: () {
+                Navigator.pop(context);
+                orderController.updateStatus(sellerId!, orderId, newStatus);
+              },
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildOrderList() {
     if (sellerId == null) {
       return const Center(child: CircularProgressIndicator());
@@ -58,27 +87,17 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
 
         final Map<String, int> statusCounts = {
           'All': allOrders.length,
-          'Pending': allOrders
-              .where((o) => o.status.toLowerCase() == 'pending')
-              .length,
-          'Paid': allOrders
-              .where((o) => o.status.toLowerCase() == 'paid')
-              .length,
-          'Shipped': allOrders
-              .where((o) => o.status.toLowerCase() == 'shipped')
-              .length,
-          'Cancelled': allOrders
-              .where((o) => o.status.toLowerCase() == 'cancelled')
-              .length,
+          'Pending': allOrders.where((o) => o.status.toLowerCase() == 'pending').length,
+          'Paid': allOrders.where((o) => o.status.toLowerCase() == 'paid').length,
+          'Shipped': allOrders.where((o) => o.status.toLowerCase() == 'shipped').length,
+          'Cancelled': allOrders.where((o) => o.status.toLowerCase() == 'cancelled').length,
         };
 
         final filteredOrders = allOrders.where((order) {
           final matchesSearch =
               (order.productName.toLowerCase()).contains(searchQuery) ||
-              (order.buyerFirstName?.toLowerCase() ?? '')
-                  .contains(searchQuery) ||
-              (order.buyerLastName?.toLowerCase() ?? '')
-                  .contains(searchQuery);
+              (order.buyerFirstName?.toLowerCase() ?? '').contains(searchQuery) ||
+              (order.buyerLastName?.toLowerCase() ?? '').contains(searchQuery);
 
           final matchesTab = selectedTabIndex == 0 ||
               (order.status.toLowerCase()) ==
@@ -90,8 +109,7 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
         if (allOrders.isEmpty) {
           return Column(
             children: [
-              const Expanded(
-                  child: Center(child: Text("No orders found"))),
+              const Expanded(child: Center(child: Text("No orders found"))),
               ClaimHistoryDesign.buildTabBar(
                 selectedIndex: selectedTabIndex,
                 tabs: tabs,
@@ -105,8 +123,7 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
         if (filteredOrders.isEmpty) {
           return Column(
             children: [
-              const Expanded(
-                  child: Center(child: Text("No matching orders"))),
+              const Expanded(child: Center(child: Text("No matching orders"))),
               ClaimHistoryDesign.buildTabBar(
                 selectedIndex: selectedTabIndex,
                 tabs: tabs,
@@ -124,19 +141,19 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
                 itemCount: filteredOrders.length,
                 itemBuilder: (context, i) {
                   final o = filteredOrders[i];
+                  final status = o.status.toLowerCase();
+
+                  // Only show buttons for allowed statuses
                   return ClaimHistoryDesign.buildOrderCard(
                     order: o,
-                    onMarkPaid: o.status.toLowerCase() != 'paid'
-                        ? () => orderController.updateStatus(
-                            sellerId!, o.id, "paid")
+                    onMarkPaid: status == 'pending'
+                        ? () => _confirmStatusChange(o.id, 'paid')
                         : null,
-                    onShip: o.status.toLowerCase() != 'shipped'
-                        ? () => orderController.updateStatus(
-                            sellerId!, o.id, "shipped")
+                    onShip: status == 'paid'
+                        ? () => _confirmStatusChange(o.id, 'shipped')
                         : null,
-                    onCancel: o.status.toLowerCase() != 'cancelled'
-                        ? () => orderController.updateStatus(
-                            sellerId!, o.id, "cancelled")
+                    onCancel: (status == 'pending' || status == 'paid' || status == 'shipped')
+                        ? () => _confirmStatusChange(o.id, 'cancelled')
                         : null,
                   );
                 },
@@ -157,7 +174,7 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
+      appBar: AppBar(
         title: const Text("Buyer Orders"),
         backgroundColor: Colors.transparent,
         elevation: 0,

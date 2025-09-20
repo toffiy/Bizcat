@@ -5,14 +5,18 @@ class Product {
   final double price;
   final String imageUrl; // ✅ New field
   final bool isVisible;
+  int totalQuantity; // 📊 For sales stats
+  double totalSales;  // 📊 For sales stats
 
   Product({
     required this.id,
     required this.name,
     required this.quantity,
     required this.price,
-    this.imageUrl = '', // default empty string
-    this.isVisible = false, // default false
+    this.imageUrl = '',
+    this.isVisible = false,
+    this.totalQuantity = 0, // default to 0
+    this.totalSales = 0.0,  // default to 0.0
   });
 
   Map<String, dynamic> toMap() {
@@ -20,8 +24,10 @@ class Product {
       'name': name,
       'quantity': quantity,
       'price': price,
-      'imageUrl': imageUrl, // ✅ Include in map
+      'imageUrl': imageUrl,
       'isVisible': isVisible,
+      'totalQuantity': totalQuantity,
+      'totalSales': totalSales,
     };
   }
 
@@ -32,9 +38,17 @@ class Product {
       quantity: map['quantity'] ?? 0,
       price: (map['price'] is int)
           ? (map['price'] as int).toDouble()
-          : (map['price'] ?? 0.0),
+          : (map['price'] is double)
+              ? map['price']
+              : double.tryParse(map['price']?.toString() ?? '0') ?? 0.0,
       imageUrl: map['imageUrl'] ?? '',
       isVisible: map['isVisible'] ?? false,
+      totalQuantity: map['totalQuantity'] ?? 0,
+      totalSales: (map['totalSales'] is int)
+          ? (map['totalSales'] as int).toDouble()
+          : (map['totalSales'] is double)
+              ? map['totalSales']
+              : double.tryParse(map['totalSales']?.toString() ?? '0') ?? 0.0,
     );
   }
 }

@@ -6,7 +6,9 @@ import '../presentation/Customer_List_Page.dart';
 import '../presentation/Claim_history_Page.dart' as claim;
 import '../presentation/sales_report_page.dart' as sales;
 import '../presentation/live_control_page.dart';
-import '../presentation/profile_page.dart'; // ⬅️ Added import here
+import '../presentation/profile_page.dart';
+import '../services/seller_service.dart';
+import '../presentation/qr_generator_page.dart'; // ⬅️ Added import here
 
 class DashboardController {
   void handleNavigation(BuildContext context, String title) {
@@ -26,7 +28,27 @@ class DashboardController {
         break;
 
       case 'QR Code Generator':
+        bool isNewAccount = true;
+
+        SellerService.getSellerId().then((sellerId) {
+          if (sellerId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => QRGeneratorPage(
+                  isNewAccount: isNewAccount,
+                  sellerId: sellerId,
+                ),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Seller ID not found')),
+            );
+          }
+        });
         break;
+
 
       case 'Claim History':
         Navigator.push(

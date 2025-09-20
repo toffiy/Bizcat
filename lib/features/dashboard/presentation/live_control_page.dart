@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../controllers/product_controller.dart';
 import '../models/product.dart';
 
@@ -10,11 +11,124 @@ class LiveControlPage extends StatefulWidget {
   State<LiveControlPage> createState() => _LiveControlPageState();
 }
 
-class _LiveControlPageState extends State<LiveControlPage> {
+class _LiveControlPageState extends State<LiveControlPage> with WidgetsBindingObserver {
   final productController = ProductController();
   String get userId => FirebaseAuth.instance.currentUser!.uid;
 
   String searchQuery = "";
+  final TextEditingController _liveLinkController = TextEditingController();
+  bool _isLive = false;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadProfileLiveData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _endLiveAndHideAll(); // Ensure cleanup on dispose
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.paused) {
+      await _endLiveAndHideAll();
+    }
+  }
+
+  Future<void> _loadProfileLiveData() async {
+    final doc = await FirebaseFirestore.instance.collection('sellers').doc(userId).get();
+    if (!mounted) return;
+    if (doc.exists) {
+      final data = doc.data()!;
+      _liveLinkController.text = data['fbLiveLink'] ?? '';
+      _isLive = data['isLive'] ?? false;
+      setState(() {});
+    }
+  }
+
+  bool isValidFacebookLiveUrl(String url) {
+    final pattern = RegExp(r'^https?:\/\/(www\.)?facebook\.com\/.*(live|videos|share|watch\/live).*');
+    return pattern.hasMatch(url.trim());
+  }
+
+  Future<void> _goLive() async {
+    final link = _liveLinkController.text.trim();
+
+    if (link.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please paste your Facebook Live link')),
+      );
+      return;
+    }
+
+    if (!isValidFacebookLiveUrl(link)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid Facebook Live URL format')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    await FirebaseFirestore.instance.collection('sellers').doc(userId).update({
+      'fbLiveLink': link,
+      'isLive': true,
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _isLive = true;
+      _isLoading = false;
+    });
+  }
+
+Future<void> _endLiveAndHideAll() async {
+  try {
+    // 1️⃣ Get all products for this seller
+    final productsSnapshot = await FirebaseFirestore.instance
+        .collection('sellers')
+        .doc(userId)
+        .collection('products')
+        .get();
+
+    // 2️⃣ Batch update all products to hide them
+    final batch = FirebaseFirestore.instance.batch();
+    for (var productDoc in productsSnapshot.docs) {
+      batch.update(productDoc.reference, {'isVisible': false});
+    }
+
+    // 3️⃣ Update seller live status in the same batch
+    final sellerRef = FirebaseFirestore.instance.collection('sellers').doc(userId);
+    batch.update(sellerRef, {
+      'isLive': false,
+      'fbLiveLink': FieldValue.delete(),
+    });
+
+    // 4️⃣ Commit all changes atomically
+    await batch.commit();
+
+    // 5️⃣ Reset local UI state immediately
+    if (!mounted) return;
+    setState(() {
+      _isLive = false;
+      _liveLinkController.clear();
+    });
+
+    debugPrint("✅ Live ended, all products hidden, and UI reset.");
+  } catch (e) {
+    debugPrint("❌ Error ending live: $e");
+  }
+}
+
 
   Future<void> _showNow(Product product) async {
     await productController.updateProduct(product.id, {'isVisible': true});
@@ -42,6 +156,59 @@ class _LiveControlPageState extends State<LiveControlPage> {
       ),
       body: Column(
         children: [
+          // 🔗 Live Link + Go Live / End Live Buttons
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _liveLinkController,
+                  decoration: const InputDecoration(
+                    labelText: 'Facebook Live Link',
+                    hintText: 'https://facebook.com/yourpage/live',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: (!_isLive && !_isLoading) ? _goLive : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Go Live Now'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLive ? _endLiveAndHideAll : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('End Live'),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 32),
+              ],
+            ),
+          ),
+
           // 🔍 Search Bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -65,9 +232,8 @@ class _LiveControlPageState extends State<LiveControlPage> {
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: Colors.grey.shade300),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.blue),
+                focusedBorder: const OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.blue),
                 ),
               ),
             ),
@@ -102,7 +268,7 @@ class _LiveControlPageState extends State<LiveControlPage> {
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final p = filteredProducts[index];
-                    final isLive = p.isVisible;
+                    final isVisible = p.isVisible;
                     final inStock = (p.quantity) > 0;
 
                     return Container(
@@ -187,25 +353,25 @@ class _LiveControlPageState extends State<LiveControlPage> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Buttons under image
+                          // Show / Hide Buttons
                           Row(
                             children: [
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: (!isLive && inStock)
+                                    backgroundColor: (_isLive && !isVisible && inStock)
                                         ? Colors.blue
                                         : Colors.grey.shade400,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    shadowColor: (!isLive && inStock)
+                                    shadowColor: (!isVisible && inStock)
                                         ? Colors.blueAccent
                                         : Colors.transparent,
-                                    elevation: (!isLive && inStock) ? 6 : 0,
+                                    elevation: (!isVisible && inStock) ? 6 : 0,
                                   ),
-                                  onPressed: (!isLive && inStock)
+                                  onPressed: (_isLive && !isVisible && inStock)
                                       ? () => _showNow(p)
                                       : null,
                                   child: const Text("Show"),
@@ -215,19 +381,19 @@ class _LiveControlPageState extends State<LiveControlPage> {
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isLive
+                                    backgroundColor: isVisible
                                         ? Colors.red
                                         : Colors.grey.shade400,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    shadowColor: isLive
+                                    shadowColor: isVisible
                                         ? Colors.redAccent
                                         : Colors.transparent,
-                                    elevation: isLive ? 6 : 0,
+                                    elevation: isVisible ? 6 : 0,
                                   ),
-                                  onPressed: isLive ? () => _hide(p) : null,
+                                  onPressed: isVisible ? () => _hide(p) : null,
                                   child: const Text("Hide"),
                                 ),
                               ),

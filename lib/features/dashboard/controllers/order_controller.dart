@@ -20,27 +20,26 @@ class OrderController {
   }
 
   /// 🔹 Get orders by status
-Stream<List<MyOrder>> getOrdersByStatus(String sellerId, String status) {
-  if (sellerId.isEmpty) return Stream.value([]);
+  Stream<List<MyOrder>> getOrdersByStatus(String sellerId, String status) {
+    if (sellerId.isEmpty) return Stream.value([]);
 
-  final normalizedStatus = status.trim().toLowerCase();
+    final normalizedStatus = status.trim().toLowerCase();
 
-  final query = _firestore
-      .collection('sellers')
-      .doc(sellerId)
-      .collection('orders')
-      .where('status', isEqualTo: normalizedStatus);
+    final query = _firestore
+        .collection('sellers')
+        .doc(sellerId)
+        .collection('orders')
+        .where('status', isEqualTo: normalizedStatus);
 
-  // Only order if timestamp exists in all docs
-  return query
-      .orderBy('timestamp', descending: true)
-      .snapshots()
-      .map((snapshot) {
-        return snapshot.docs
-            .map((doc) => MyOrder.fromMap(doc.id, doc.data()))
-            .toList();
-      });
-}
+    return query
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => MyOrder.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
 
   /// 🔹 Group orders by status
   Stream<Map<String, List<MyOrder>>> getOrdersGroupedByStatus(String sellerId) {

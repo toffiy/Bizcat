@@ -4,6 +4,9 @@ import '../models/dash_item.dart';
 import '../controllers/dashboard_controller.dart';
 import '../../auth/Services/auth_service.dart';
 
+/// ----------------------
+/// DASHBOARD APP BAR
+/// ----------------------
 PreferredSizeWidget buildDashboardAppBar({
   required BuildContext context,
   required String sellerId,
@@ -23,7 +26,6 @@ PreferredSizeWidget buildDashboardAppBar({
     ),
     centerTitle: true,
     actions: [
-      // 🔹 Removed logout button here
       StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('sellers')
@@ -67,30 +69,41 @@ PreferredSizeWidget buildDashboardAppBar({
   );
 }
 
+/// ----------------------
+/// STAT CARD
+/// ----------------------
 class StatCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
   final Color iconColor;
+  final bool highlight;
 
   const StatCard({
     required this.title,
     required this.value,
     required this.icon,
     required this.iconColor,
+    this.highlight = false,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.white, Colors.grey.shade50],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: highlight
+            ? LinearGradient(
+                colors: [iconColor.withOpacity(0.15), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: [Colors.white, Colors.grey.shade50],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
@@ -102,33 +115,46 @@ class StatCard extends StatelessWidget {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircleAvatar(
             radius: 20,
             backgroundColor: iconColor.withOpacity(0.15),
             child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.3,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ✅ Auto-shrink large numbers
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: highlight ? 20 : 18, // smaller font
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                      color: highlight ? iconColor : Colors.black87,
+                    ),
+                  ),
                 ),
-              ),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                  letterSpacing: 0.2,
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12, // smaller title font
+                    color: Colors.grey,
+                    letterSpacing: 0.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -136,6 +162,9 @@ class StatCard extends StatelessWidget {
   }
 }
 
+/// ----------------------
+/// QUICK ACTION ITEM
+/// ----------------------
 class DashboardQuickActionItem extends StatelessWidget {
   final DashboardItem item;
   final VoidCallback onTap;
