@@ -4,7 +4,7 @@ import '../models/order.dart';
 class OrderController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// 🔹 Get all orders for a seller
+  /// 🔹 Get all orders for a seller (live stream, ordered by timestamp)
   Stream<List<MyOrder>> getOrdersForSeller(String sellerId) {
     return _firestore
         .collection('sellers')
@@ -19,7 +19,7 @@ class OrderController {
     });
   }
 
-  /// 🔹 Get orders by status
+  /// 🔹 Get orders by status (live stream)
   Stream<List<MyOrder>> getOrdersByStatus(String sellerId, String status) {
     if (sellerId.isEmpty) return Stream.value([]);
 
@@ -41,60 +41,69 @@ class OrderController {
     });
   }
 
-  /// 🔹 Group orders by status
-  Stream<Map<String, List<MyOrder>>> getOrdersGroupedByStatus(String sellerId) {
-    return getOrdersForSeller(sellerId).map((orders) {
-      final Map<String, List<MyOrder>> grouped = {
-        'pending': [],
-        'paid': [],
-        'shipped': [],
-        'cancelled': [],
-      };
-      for (var o in orders) {
-        final key = o.status.trim().toLowerCase();
-        if (grouped.containsKey(key)) {
-          grouped[key]!.add(o);
-        }
-      }
-      return grouped;
-    });
-  }
-
-  /// 🔹 Fetch single order
-  Future<MyOrder?> getOrderById(String sellerId, String orderId) async {
-    final doc = await _firestore
+  /// 🔹 One-time fetch of orders for a seller by status
+  /// Requires composite index: (status ASC, timestamp DESC)
+  Future<List<MyOrder>> getOrdersOnce(String sellerId, String status) async {
+    Query<Map<String, dynamic>> query = _firestore
         .collection('sellers')
         .doc(sellerId)
-        .collection('orders')
-        .doc(orderId)
-        .get();
+        .collection('orders');
 
-    if (!doc.exists) return null;
-    return MyOrder.fromMap(doc.id, doc.data()!);
+    if (status != 'all') {
+      query = query.where('status', isEqualTo: status);
+    }
+
+    // ✅ Always order by timestamp (requires index if combined with where)
+    final snap = await query.orderBy('timestamp', descending: true).get();
+
+    final orders = snap.docs.map((d) => MyOrder.fromMap(d.id, d.data())).toList();
+
+    if (status == 'all') {
+      // ✅ Exclude cancelled in memory
+      return orders.where((o) => o.status.toLowerCase() != 'cancelled').toList();
+    } else {
+      return orders;
+    }
   }
 
-  /// 🔹 Stream single order
-  Stream<MyOrder?> streamOrderById(String sellerId, String orderId) {
-    return _firestore
-        .collection('sellers')
-        .doc(sellerId)
-        .collection('orders')
-        .doc(orderId)
-        .snapshots()
-        .map((doc) =>
-            doc.exists ? MyOrder.fromMap(doc.id, doc.data()!) : null);
+  /// 🔹 Batch mark multiple orders as seen (prevents lag)
+  Future<void> markOrdersAsSeenBatch(String sellerId, List<MyOrder> orders) async {
+    final batch = _firestore.batch();
+    for (var o in orders.where((o) => !o.seenBySeller)) {
+      final ref = _firestore
+          .collection('sellers')
+          .doc(sellerId)
+          .collection('orders')
+          .doc(o.id);
+      batch.update(ref, {'seenBySeller': true});
+    }
+    await batch.commit();
   }
 
-  /// 🔹 Update status
-  Future<void> updateStatus(
-      String sellerId, String orderId, String newStatus) async {
-    await _firestore
-        .collection('sellers')
-        .doc(sellerId)
-        .collection('orders')
-        .doc(orderId)
-        .update({'status': newStatus});
+  /// 🔹 Update status of a single order
+Future<void> updateStatus(
+  String sellerId,
+  String orderId,
+  String newStatus, {
+  String? paymentMethod,
+}) async {
+  final data = {
+    'status': newStatus,
+    'updatedAt': DateTime.now(),
+  };
+
+  if (paymentMethod != null) {
+    data['paymentMethod'] = paymentMethod; // ✅ Save Cash/GCash
   }
+
+  await _firestore
+      .collection('sellers')
+      .doc(sellerId)
+      .collection('orders')
+      .doc(orderId)
+      .update(data);
+}
+
 
   /// 🔹 Delete order
   Future<void> deleteOrder(String sellerId, String orderId) async {
@@ -104,5 +113,15 @@ class OrderController {
         .collection('orders')
         .doc(orderId)
         .delete();
+  }
+
+  /// 🔹 Mark single order as seen
+  Future<void> markAsSeen(String sellerId, String orderId) async {
+    await _firestore
+        .collection('sellers')
+        .doc(sellerId)
+        .collection('orders')
+        .doc(orderId)
+        .update({'seenBySeller': true});
   }
 }

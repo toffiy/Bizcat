@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:pdf/pdf.dart'; // ✅ Needed for PdfPageFormat & PdfColors
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
@@ -35,41 +35,51 @@ class _SalesReportPageState extends State<SalesReportPage> {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  // Dropdown helpers
   List<int> _getAvailableYears(List<MyOrder> orders) {
-    final years = orders.map((o) => _toDate(o.timestamp).year).toSet().toList()
+    return orders
+        .where((o) =>
+            o.status.toLowerCase() == "paid" ||
+            o.status.toLowerCase() == "completed")
+        .map((o) => _toDate(o.timestamp).year)
+        .toSet()
+        .toList()
       ..sort((a, b) => b.compareTo(a));
-    return years;
   }
 
   List<int> _getAvailableMonths(List<MyOrder> orders) {
     if (selectedYear == null) return [];
-    final months = orders
-        .where((o) => _toDate(o.timestamp).year == selectedYear)
+    return orders
+        .where((o) =>
+            (o.status.toLowerCase() == "paid" ||
+                o.status.toLowerCase() == "completed") &&
+            _toDate(o.timestamp).year == selectedYear)
         .map((o) => _toDate(o.timestamp).month)
         .toSet()
         .toList()
       ..sort();
-    return months;
   }
 
   List<int> _getAvailableDays(List<MyOrder> orders) {
     if (selectedYear == null || selectedMonth == null) return [];
-    final days = orders
+    return orders
         .where((o) =>
+            (o.status.toLowerCase() == "paid" ||
+                o.status.toLowerCase() == "completed") &&
             _toDate(o.timestamp).year == selectedYear &&
             _toDate(o.timestamp).month == selectedMonth)
         .map((o) => _toDate(o.timestamp).day)
         .toSet()
         .toList()
       ..sort();
-    return days;
   }
 
+  // Apply filters
   List<MyOrder> _filterOrders(List<MyOrder> orders) {
     return orders.where((o) {
       final date = _toDate(o.timestamp);
       final status = o.status.toLowerCase();
-      final isFulfilled = status == "paid" || status == "shipped";
+      final isFulfilled = status == "paid" || status == "completed";
       if (!isFulfilled) return false;
       if (selectedYear != null && date.year != selectedYear) return false;
       if (selectedMonth != null && date.month != selectedMonth) return false;
@@ -78,6 +88,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
     }).toList();
   }
 
+  // Export to PDF
   Future<void> _exportToPDF({
     required List<MyOrder> orders,
     required double totalRevenue,
@@ -107,7 +118,8 @@ class _SalesReportPageState extends State<SalesReportPage> {
           pw.Table.fromTextArray(
             headers: ['Date', 'Product', 'Qty', 'Total'],
             headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
-            headerStyle: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+            headerStyle:
+                pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
             cellStyle: const pw.TextStyle(fontSize: 11),
             columnWidths: {
               0: const pw.FlexColumnWidth(2),
@@ -115,12 +127,14 @@ class _SalesReportPageState extends State<SalesReportPage> {
               2: const pw.FlexColumnWidth(1),
               3: const pw.FlexColumnWidth(2),
             },
-            data: orders.map((o) => [
-              _formatDate(o.timestamp),
-              o.productName,
-              o.quantity.toString(),
-              'PHP ${o.totalAmount.toStringAsFixed(2)}'
-            ]).toList(),
+            data: orders
+                .map((o) => [
+                      _formatDate(o.timestamp),
+                      o.productName,
+                      o.quantity.toString(),
+                      'PHP ${o.totalAmount.toStringAsFixed(2)}'
+                    ])
+                .toList(),
           ),
         ],
       ),
@@ -151,15 +165,12 @@ class _SalesReportPageState extends State<SalesReportPage> {
 
           final filtered = _filterOrders(orders);
 
-          final totalRevenue = filtered.fold<double>(
-            0.0,
-            (sum, o) => sum + (o.totalAmount),
-          );
+          final totalRevenue =
+              filtered.fold<double>(0.0, (sum, o) => sum + o.totalAmount);
 
           final completedCount = filtered.length;
-          final avgSale = completedCount > 0
-              ? totalRevenue / completedCount
-              : 0.0;
+          final avgSale =
+              completedCount > 0 ? totalRevenue / completedCount : 0.0;
 
           final pendingCount = orders
               .where((o) => o.status.toLowerCase() == 'pending')
@@ -171,10 +182,6 @@ class _SalesReportPageState extends State<SalesReportPage> {
                 child: SalesReportDesign(
                   orders: orders,
                   filteredOrders: filtered,
-                  totalRevenue: totalRevenue,
-                  completedCount: completedCount,
-                  avgSale: avgSale,
-                  pendingCount: pendingCount,
                   selectedYear: selectedYear,
                   selectedMonth: selectedMonth,
                   selectedDay: selectedDay,

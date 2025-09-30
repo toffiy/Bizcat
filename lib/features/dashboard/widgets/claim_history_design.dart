@@ -1,4 +1,3 @@
-// lib/designs/claim_history_design.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
@@ -26,12 +25,13 @@ class ClaimHistoryDesign {
     );
   }
 
-  /// Bottom tab bar with status counts
+  /// Bottom tab bar with status counts and notification badges
   static Widget buildTabBar({
     required int selectedIndex,
     required List<Map<String, dynamic>> tabs,
     required Map<String, int> statusCounts,
     required ValueChanged<int> onTap,
+    required Set<int> clearedTabs,
   }) {
     return BottomNavigationBar(
       currentIndex: selectedIndex,
@@ -42,11 +42,13 @@ class ClaimHistoryDesign {
       items: List.generate(tabs.length, (index) {
         final tab = tabs[index];
         final count = statusCounts[tab['label']] ?? 0;
+        final showBadge = count > 0 && !clearedTabs.contains(index);
+
         return BottomNavigationBarItem(
           icon: Stack(
             children: [
               Icon(tab['icon']),
-              if (count > 0)
+              if (showBadge)
                 Positioned(
                   right: 0,
                   top: 0,
@@ -56,8 +58,8 @@ class ClaimHistoryDesign {
                       color: Colors.red,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    constraints: const BoxConstraints(
-                        minWidth: 16, minHeight: 16),
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
                     child: Text(
                       '$count',
                       style: const TextStyle(
@@ -83,7 +85,12 @@ class ClaimHistoryDesign {
     required VoidCallback? onMarkPaid,
     required VoidCallback? onShip,
     required VoidCallback? onCancel,
+    bool hideIfCancelled = false,
   }) {
+    if (hideIfCancelled && order.status.toLowerCase() == 'cancelled') {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -163,19 +170,46 @@ class ClaimHistoryDesign {
           _iconText(Icons.calendar_today,
               DateFormat('MM/dd/yyyy').format(order.timestamp)),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: _statusColor(order.status),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              order.status.toUpperCase(),
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
+
+          // Status + Payment Method badges
+          Row(
+            children: [
+              // Always show status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusColor(order.status),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  order.status.toUpperCase(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+
+              // Show payment method badge if Paid
+              if (order.status.toLowerCase() == 'paid' &&
+                  order.paymentMethod != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _paymentColor(order.paymentMethod),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    order.paymentMethod!.toUpperCase(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           const SizedBox(height: 12),
@@ -239,6 +273,18 @@ class ClaimHistoryDesign {
         return Colors.blue.shade300;
       case 'cancelled':
         return Colors.red.shade300;
+      default:
+        return Colors.grey.shade300;
+    }
+  }
+
+  /// Payment method color mapping
+  static Color _paymentColor(String? method) {
+    switch (method?.toLowerCase()) {
+      case 'gcash':
+        return Colors.teal.shade300;
+      case 'cash':
+        return Colors.orange.shade300;
       default:
         return Colors.grey.shade300;
     }

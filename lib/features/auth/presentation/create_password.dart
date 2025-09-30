@@ -32,8 +32,8 @@ class _CreatePasswordPageState extends State<CreatePasswordPage> {
     if (!RegExp(r'\d').hasMatch(password)) {
       errors.add("a number");
     }
-    if (!RegExp(r'[@$!%*?&]').hasMatch(password)) {
-      errors.add("a special character (@\$!%*?&)");
+    if (!RegExp(r'[@$!%*?&-_]').hasMatch(password)) {
+      errors.add("a special character");
     }
 
     return errors;

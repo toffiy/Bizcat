@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
+import 'sales_chart_design.dart'; // 👈 import the separated chart widget
 
 class SalesReportDesign extends StatelessWidget {
   final List<MyOrder> orders;
   final List<MyOrder> filteredOrders;
-  final double totalRevenue;
-  final int completedCount;
-  final double avgSale;
-  final int pendingCount;
 
   final int? selectedYear;
   final int? selectedMonth;
@@ -27,10 +24,6 @@ class SalesReportDesign extends StatelessWidget {
     super.key,
     required this.orders,
     required this.filteredOrders,
-    required this.totalRevenue,
-    required this.completedCount,
-    required this.avgSale,
-    required this.pendingCount,
     required this.selectedYear,
     required this.selectedMonth,
     required this.selectedDay,
@@ -43,77 +36,65 @@ class SalesReportDesign extends StatelessWidget {
     required this.toDate,
   });
 
-  /// Summary card — only icon has color
-  Widget _summaryCard(String label, String value, Color iconColor, IconData icon) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.all(6),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 20, color: iconColor),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 13, color: Colors.black)),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Filters row
+  /// ----------------------
+  /// FILTERS
+  /// ----------------------
   Widget _filters() {
     final years = getAvailableYears(orders);
     final months = getAvailableMonths(orders);
     final days = getAvailableDays(orders);
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           Expanded(
-            child: DropdownButton<int?>(
-              isExpanded: true,
+            child: DropdownButtonFormField<int?>(
               value: selectedYear,
-              hint: const Text("Year"),
+              decoration: const InputDecoration(
+                labelText: "Year",
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
               items: [
                 const DropdownMenuItem<int?>(value: null, child: Text("All")),
-                ...years.map((y) => DropdownMenuItem<int?>(value: y, child: Text(y.toString()))),
+                ...years.map((y) =>
+                    DropdownMenuItem<int?>(value: y, child: Text(y.toString()))),
               ],
               onChanged: onYearChanged,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: DropdownButton<int?>(
-              isExpanded: true,
+            child: DropdownButtonFormField<int?>(
               value: selectedMonth,
-              hint: const Text("Month"),
+              decoration: const InputDecoration(
+                labelText: "Month",
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
               items: [
                 const DropdownMenuItem<int?>(value: null, child: Text("All")),
                 ...months.map((m) => DropdownMenuItem<int?>(
-                    value: m, child: Text(DateFormat.MMMM().format(DateTime(0, m))))),
+                    value: m,
+                    child: Text(DateFormat.MMMM().format(DateTime(0, m))))),
               ],
               onChanged: onMonthChanged,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: DropdownButton<int?>(
-              isExpanded: true,
+            child: DropdownButtonFormField<int?>(
               value: selectedDay,
-              hint: const Text("Day"),
+              decoration: const InputDecoration(
+                labelText: "Day",
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
               items: [
                 const DropdownMenuItem<int?>(value: null, child: Text("All")),
-                ...days.map((d) => DropdownMenuItem<int?>(value: d, child: Text(d.toString()))),
+                ...days.map((d) =>
+                    DropdownMenuItem<int?>(value: d, child: Text(d.toString()))),
               ],
               onChanged: onDayChanged,
             ),
@@ -123,31 +104,27 @@ class SalesReportDesign extends StatelessWidget {
     );
   }
 
-  /// Order list tile — icons in one neutral color
+  /// ----------------------
+  /// ORDER TILE
+  /// ----------------------
   Widget _orderTile(MyOrder o) {
     final date = toDate(o.timestamp);
     return Card(
-      color: Colors.white,
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
       child: ListTile(
         title: Text(
           "${o.buyerFirstName ?? ''} ${o.buyerLastName ?? ''} — ${o.productName}",
-          style: const TextStyle(color: Colors.black),
+          style: const TextStyle(
+              color: Colors.black, fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (o.buyerPhone != null && o.buyerPhone!.isNotEmpty)
-              Row(
-                children: [
-                  Icon(Icons.phone, size: 16, color: Colors.grey[700]),
-                  const SizedBox(width: 4),
-                  Text(o.buyerPhone!, style: const TextStyle(color: Colors.black)),
-                ],
-              ),
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey[700]),
+                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                 const SizedBox(width: 4),
                 Text(DateFormat('dd/MM/yyyy').format(date),
                     style: const TextStyle(color: Colors.black)),
@@ -156,7 +133,7 @@ class SalesReportDesign extends StatelessWidget {
             if (o.buyerAddress != null && o.buyerAddress!.isNotEmpty)
               Row(
                 children: [
-                  Icon(Icons.location_on, size: 16, color: Colors.grey[700]),
+                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(o.buyerAddress!,
@@ -179,32 +156,69 @@ class SalesReportDesign extends StatelessWidget {
     );
   }
 
+  /// ----------------------
+  /// BUILD METHOD
+  /// ----------------------
   @override
   Widget build(BuildContext context) {
-    // Prevent avgSale error by ensuring it's valid
-    final safeAvgSale = completedCount > 0 ? avgSale : 0;
+    final totalRevenue = filteredOrders.fold<double>(
+        0, (sum, order) => sum + order.totalAmount);
+
+    final paidOrdersCount = filteredOrders
+        .where((o) =>
+            o.status.toLowerCase() == "paid" ||
+            o.status.toLowerCase() == "completed")
+        .length;
 
     return Column(
       children: [
-        // Summary cards
-        Row(
-          children: [
-            _summaryCard("Revenue", "₱${totalRevenue.toStringAsFixed(2)}",
-                Colors.green, Icons.attach_money),
-            _summaryCard("Sales", "$completedCount",
-                Colors.blue, Icons.shopping_cart),
-          ],
-        ),
-        Row(
-          children: [
-            _summaryCard("Avg Sale", "₱${safeAvgSale.toStringAsFixed(2)}",
-                Colors.orange, Icons.analytics),
-            _summaryCard("Pending", "$pendingCount",
-                Colors.red, Icons.pending_actions),
-          ],
+        // Stats card
+        Card(
+          margin: const EdgeInsets.all(16),
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Column(
+                  children: [
+                    const Text("Total Revenue",
+                        style: TextStyle(fontSize: 14, color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Text("₱${totalRevenue.toStringAsFixed(2)}",
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black)),
+                  ],
+                ),
+                Column(
+                  children: [
+                    const Text("Paid Orders",
+                        style: TextStyle(fontSize: 14, color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Text("$paidOrdersCount",
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black)),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
 
-        const Divider(thickness: 1),
+        // Chart (from separate file)
+        SalesChartDesign(
+          filteredOrders: filteredOrders,
+          selectedYear: selectedYear,
+          selectedMonth: selectedMonth,
+          selectedDay: selectedDay,
+          toDate: toDate,
+        ),
 
         // Filters
         _filters(),

@@ -16,6 +16,7 @@ PreferredSizeWidget buildDashboardAppBar({
   return AppBar(
     backgroundColor: Colors.white,
     elevation: 0,
+    automaticallyImplyLeading: false, // ✅ removes the back button
     title: const Text(
       'Seller Dashboard',
       style: TextStyle(
@@ -68,6 +69,7 @@ PreferredSizeWidget buildDashboardAppBar({
     ],
   );
 }
+
 
 /// ----------------------
 /// STAT CARD

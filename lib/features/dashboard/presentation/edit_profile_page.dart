@@ -52,6 +52,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() => _profileImageUrl = url);
     } catch (e) {
       debugPrint('Error uploading image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Image upload failed. Try again.")),
+      );
     }
     setState(() => _isSaving = false);
   }
@@ -73,12 +76,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'profileImageUrl': _profileImageUrl,
       });
 
-      Navigator.pop(context, true); // Return to ProfilePage
+      Navigator.pop(context, true);
     } catch (e) {
       debugPrint('Error saving profile: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to save profile. Try again.")),
+      );
     }
 
     setState(() => _isSaving = false);
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
   }
 
   @override
@@ -87,8 +103,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       appBar: AppBar(
         title: const Text("Edit Profile"),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        foregroundColor: Colors.black87,
+        elevation: 0.5,
       ),
       body: _isSaving
           ? const Center(child: CircularProgressIndicator())
@@ -98,52 +114,107 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    // Profile Avatar
                     GestureDetector(
                       onTap: _pickImage,
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundImage: _profileImageUrl != null
-                            ? NetworkImage(_profileImageUrl!)
-                            : const AssetImage('lib/assets/default_avatar.png')
-                                as ImageProvider,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 55,
+                            backgroundImage: _profileImageUrl != null
+                                ? NetworkImage(_profileImageUrl!)
+                                : const AssetImage('lib/assets/default_avatar.png')
+                                    as ImageProvider,
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 30),
+
+                    // First Name
                     TextFormField(
                       initialValue: _firstName,
-                      decoration: const InputDecoration(labelText: "First Name"),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? "Enter first name" : null,
-                      onSaved: (v) => _firstName = v!,
+                      decoration: _inputDecoration("First Name"),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return "Enter first name";
+                        }
+                        if (v.length < 2) {
+                          return "Must be at least 2 characters";
+                        }
+                        if (!RegExp(r"^[a-zA-Z]+$").hasMatch(v)) {
+                          return "Only letters allowed";
+                        }
+                        return null;
+                      },
+                      onSaved: (v) => _firstName = v!.trim(),
                     ),
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 20),
+
+                    // Last Name
                     TextFormField(
                       initialValue: _lastName,
-                      decoration: const InputDecoration(labelText: "Last Name"),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? "Enter last name" : null,
-                      onSaved: (v) => _lastName = v!,
+                      decoration: _inputDecoration("Last Name"),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return "Enter last name";
+                        }
+                        if (!RegExp(r"^[a-zA-Z]+$").hasMatch(v)) {
+                          return "Only letters allowed";
+                        }
+                        return null;
+                      },
+                      onSaved: (v) => _lastName = v!.trim(),
                     ),
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 20),
+
+                    // Email
                     TextFormField(
                       initialValue: _email,
-                      decoration: const InputDecoration(labelText: "Email"),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? "Enter email" : null,
-                      onSaved: (v) => _email = v!,
+                      decoration: _inputDecoration("Email"),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return "Enter email";
+                        }
+                     if (!RegExp(r'^[\w.-]+@([\w-]+\.)+[a-zA-Z]{2,}$').hasMatch(v)) {
+  return "Enter a valid email";
+}
+
+                        return null;
+                      },
+                      onSaved: (v) => _email = v!.trim(),
                     ),
                     const SizedBox(height: 30),
+
+                    // Save Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _saveProfile,
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: Colors.blueAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
                         ),
                         child: const Text(
                           "Save Changes",
-                          style: TextStyle(fontSize: 16),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

@@ -84,7 +84,7 @@ class ProductController {
 
       } while (true);
 
-      return compressedFile!;
+      return compressedFile;
     }
 
 

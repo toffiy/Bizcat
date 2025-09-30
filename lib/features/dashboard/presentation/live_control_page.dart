@@ -176,7 +176,7 @@ Future<void> _endLiveAndHideAll() async {
                       child: ElevatedButton(
                         onPressed: (!_isLive && !_isLoading) ? _goLive : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: Colors.blueAccent,
                           foregroundColor: Colors.white,
                         ),
                         child: _isLoading

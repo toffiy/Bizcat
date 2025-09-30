@@ -1,11 +1,14 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../controllers/product_controller.dart';
 import 'trash_page.dart';
-import '../widgets/product_catalog_design.dart'; 
+
+// Widgets
+import '../widgets/product_card.dart';
+import '../widgets/top_selling_card.dart'; // ✅ make sure this matches your widget file
+import '../widgets/add_product_dialog.dart';
+import '../widgets/edit_product_dialog.dart';
 
 class ProductCatalogPage extends StatefulWidget {
   const ProductCatalogPage({super.key});
@@ -16,8 +19,6 @@ class ProductCatalogPage extends StatefulWidget {
 
 class _ProductCatalogPageState extends State<ProductCatalogPage> {
   final ProductController _controller = ProductController();
-  XFile? selectedImage;
-  bool isUploading = false;
 
   // 📊 Highlights state
   List<Map<String, dynamic>> topSelling = [];
@@ -38,242 +39,71 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     });
   }
 
-  // ✅ Dialog to Add Product
-  void _showAddProductDialog() {
-    final nameController = TextEditingController();
-    final qtyController = TextEditingController();
-    final priceController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+  // ✅ Show Add Product Dialog
+ void _showAddProductDialog() {
+  AddProductDialog.show(context, (name, qty, price, image) async {
+    final imageUrl = await _controller.uploadImageToCloudinary(image);
+    await _controller.addProduct(name, qty, price, imageUrl);
+    _loadHighlights();
+  });
+}
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text("Add Product"),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ✅ Image preview
-                      GestureDetector(
-                        onTap: () async {
-                          final picker = ImagePicker();
-                          final image = await picker.pickImage(
-                            source: ImageSource.gallery,
-                          );
-                          if (image != null) {
-                            setDialogState(() => selectedImage = image);
-                            setState(() => selectedImage = image);
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.grey[200],
-                            border: Border.all(color: Colors.grey.shade400),
-                          ),
-                          child: selectedImage != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.file(
-                                    File(selectedImage!.path),
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : const Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.image,
-                                          size: 40, color: Colors.grey),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        "Tap to select image",
-                                        style: TextStyle(color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
 
-                      TextFormField(
-                        controller: nameController,
-                        decoration:
-                            const InputDecoration(labelText: "Name"),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Name is required";
-                          }
-                          return null;
-                        },
-                      ),
-                      TextFormField(
-                        controller: qtyController,
-                        keyboardType: TextInputType.number,
-                        decoration:
-                            const InputDecoration(labelText: "Quantity"),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Quantity is required";
-                          }
-                          if (int.tryParse(value) == null) {
-                            return "Enter a valid number";
-                          }
-                          return null;
-                        },
-                      ),
-                      TextFormField(
-                        controller: priceController,
-                        keyboardType: TextInputType.number,
-                        decoration:
-                            const InputDecoration(labelText: "Price"),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Price is required";
-                          }
-                          if (double.tryParse(value) == null) {
-                            return "Enter a valid price";
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    setState(() => selectedImage = null);
-                    Navigator.pop(context);
-                  },
-                  child: const Text("Cancel"),
-                ),
-                ElevatedButton(
-                  onPressed: isUploading
-                      ? null
-                      : () async {
-                          if (!formKey.currentState!.validate()) return;
-
-                          final name = nameController.text.trim();
-                          final qty = int.parse(qtyController.text);
-                          final price = double.parse(priceController.text);
-
-                          if (selectedImage == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text("Please select an image")),
-                            );
-                            return;
-                          }
-
-                          // ✅ Prevent double tap
-                          setDialogState(() => isUploading = true);
-                          setState(() => isUploading = true);
-
-                          try {
-                            final imageUrl = await _controller
-                                .uploadImageToCloudinary(selectedImage!);
-
-                            await _controller.addProduct(
-                                name, qty, price, imageUrl);
-
-                            setState(() {
-                              selectedImage = null;
-                              isUploading = false;
-                            });
-
-                            Navigator.pop(context);
-                          } catch (e) {
-                            setState(() => isUploading = false);
-                            setDialogState(() => isUploading = false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text("Upload failed: $e")),
-                            );
-                          }
-                        },
-                  child: isUploading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text("Add"),
-                )
-              ],
-            );
-          },
-        );
+  // ✅ Show Edit Product Dialog
+  void _showEditProductDialog(String id, Map<String, dynamic> data) {
+    EditProductDialog.show(
+      context,
+      name: data['name'],
+      qty: data['quantity'],
+      price: (data['price'] as num).toDouble(),
+      onSubmit: (name, qty, price) async {
+        await _controller.updateProduct(id, {
+          'name': name,
+          'quantity': qty,
+          'price': price,
+        });
+        _loadHighlights();
       },
     );
   }
 
-  // ✅ Dialog to Edit Product
-  void _showEditProductDialog(String id, Map<String, dynamic> data) {
-    final nameController = TextEditingController(text: data['name']);
-    final qtyController =
-        TextEditingController(text: data['quantity'].toString());
-    final priceController =
-        TextEditingController(text: data['price'].toString());
-
-    showDialog(
+  // ✅ Confirmation before moving to Trash
+  Future<void> _confirmDelete(String id, Map<String, dynamic> data) async {
+    final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Edit Product"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: "Name"),
-            ),
-            TextField(
-              controller: qtyController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "Quantity"),
-            ),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "Price"),
-            ),
-          ],
+        title: const Text("Move to Trash"),
+        content: const Text(
+          "Are you sure you want to move this product to Trash?\n\n"
+          "You can restore it later from the Trash page.",
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              final qty = int.tryParse(qtyController.text) ?? 0;
-              final price = double.tryParse(priceController.text) ?? 0.0;
-
-              if (name.isNotEmpty) {
-                _controller.updateProduct(id, {
-                  'name': name,
-                  'quantity': qty,
-                  'price': price,
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text("Save"),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Move to Trash"),
           ),
         ],
       ),
     );
+
+    if (shouldDelete == true) {
+      await _controller.moveToTrash(id, data);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Product moved to Trash"),
+            behavior: SnackBarBehavior.floating, // ✅ bottom floating style
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -285,6 +115,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
           IconButton(
             onPressed: _showAddProductDialog,
             icon: const Icon(Icons.add),
+            tooltip: "Add Product",
           ),
           IconButton(
             onPressed: () {
@@ -300,142 +131,65 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
       ),
       body: Column(
         children: [
-         // 📊 Highlights Section
-      if (loadingHighlights)
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: CircularProgressIndicator(),
-        )
-      else if (topSelling.isNotEmpty)
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: const [
-                  Icon(Icons.emoji_events, color: Colors.amber, size: 20),
-                  SizedBox(width: 6),
-                  Text(
-                    "Top Selling Products",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: 160,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: topSelling.length,
-                itemBuilder: (context, index) {
-                  final product = topSelling[index];
-                  return Container(
-                    width: 200,
-                    margin: EdgeInsets.only(
-                      left: index == 0 ? 16 : 8,
-                      right: index == topSelling.length - 1 ? 16 : 8,
-                    ),
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 3,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Rank badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: index == 0
-                                    ? Colors.amber
-                                    : index == 1
-                                        ? Colors.grey
-                                        : Colors.brown,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                "#${index + 1}",
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Product name
-                            Text(
-                              product['productName'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-
-                            // Quantity sold
-                            Text(
-                              "Sold: ${product['totalQty']}",
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.blueGrey,
-                              ),
-                            ),
-
-                            // Revenue
-                            Text(
-                              "₱${product['totalRevenue'].toStringAsFixed(2)}",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-
-                            const Spacer(),
-
-                            // Optional: product image placeholder
-                            Align(
-                              alignment: Alignment.bottomRight,
-                              child: CircleAvatar(
-                                radius: 20,
-                                backgroundColor: Colors.grey[200],
-                                backgroundImage: product['imageUrl'] != null &&
-                                        product['imageUrl'].toString().isNotEmpty
-                                    ? NetworkImage(product['imageUrl'])
-                                    : null,
-                                child: (product['imageUrl'] == null ||
-                                        product['imageUrl'].toString().isEmpty)
-                                    ? const Icon(Icons.image_not_supported,
-                                        size: 18, color: Colors.grey)
-                                    : null,
-                              ),
-                            ),
-                          ],
+          // 📊 Highlights Section
+          if (loadingHighlights)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
+            )
+          else if (topSelling.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.emoji_events, color: Colors.amber, size: 20),
+                      SizedBox(width: 6),
+                      Text(
+                        "Top Selling Products",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                      Spacer(),
+                      Text(
+                        "View All",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 210,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: topSelling.length,
+                    itemBuilder: (context, index) {
+                      final product = topSelling[index];
+                      return TopSellingTile(
+                        rank: index + 1,
+                        name: product['productName'] ?? '',
+                        sold: product['totalQty'] ?? 0,
+                        revenue: (product['totalRevenue'] as num).toDouble(),
+                        imageUrl: product['imageUrl'],               
+                      );
+                    },
+                  ),
+                ),
+              ],
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text("No sales data yet"),
             ),
-          ],
-        )
-      else
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text("No sales data yet"),
-        ),
-
 
           // 📦 Product List
           Expanded(
@@ -461,10 +215,10 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                     return ProductCard(
                       name: data['name'],
                       quantity: data['quantity'],
-                      price: data['price'],
+                      price: (data['price'] as num).toDouble(),
                       imageUrl: data['imageUrl'],
                       onEdit: () => _showEditProductDialog(doc.id, data),
-                      onDelete: () => _controller.moveToTrash(doc.id, data),
+                      onDelete: () => _confirmDelete(doc.id, data),
                     );
                   },
                 );

@@ -11,7 +11,8 @@ class MyOrder {
   final String status;
   final DateTime timestamp;
   final String? notes;
-
+  final String? paymentMethod; // ✅ now properly wired
+  
   // 🔹 Buyer details
   final String? buyerId;
   final String? buyerFirstName;
@@ -19,6 +20,7 @@ class MyOrder {
   final String? buyerAddress;
   final String? buyerPhone;
   final String? buyerEmail;
+  final bool seenBySeller;
 
   MyOrder({
     required this.id,
@@ -31,12 +33,14 @@ class MyOrder {
     required this.status,
     required this.timestamp,
     this.notes,
+    this.paymentMethod, // ✅ added to constructor
     required this.buyerId,
     required this.buyerFirstName,
     required this.buyerLastName,
     required this.buyerAddress,
     required this.buyerPhone,
     required this.buyerEmail,
+    this.seenBySeller = false,
   });
 
   factory MyOrder.fromMap(String id, Map<String, dynamic> data) {
@@ -55,13 +59,15 @@ class MyOrder {
           ? (data['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
 
-      notes: data['notes'] ?? '',
-      buyerId: data['buyerId'] ?? '',
-      buyerFirstName: data['buyerFirstName'] ?? '',
-      buyerLastName: data['buyerLastName'] ?? '',
-      buyerAddress: data['buyerAddress'] ?? '',
-      buyerPhone: data['buyerPhone'] ?? '',
-      buyerEmail: data['buyerEmail'] ?? '',
+      notes: data['notes'],
+      paymentMethod: data['paymentMethod'], // ✅ map it from Firestore
+      buyerId: data['buyerId'],
+      buyerFirstName: data['buyerFirstName'],
+      buyerLastName: data['buyerLastName'],
+      buyerAddress: data['buyerAddress'],
+      buyerPhone: data['buyerPhone'],
+      buyerEmail: data['buyerEmail'],
+      seenBySeller: data['seenBySeller'] ?? false,
     );
   }
 }

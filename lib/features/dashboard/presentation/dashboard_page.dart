@@ -147,16 +147,23 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context, snapshot) {
         double total = 0;
         final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
         if (snapshot.hasData) {
           for (var order in snapshot.data!) {
+            // Skip cancelled orders
+            final status = (order.status ?? '').toString().trim().toLowerCase();
+            if (status == 'cancelled') continue;
+
             final dateTime = order.timestamp is Timestamp
                 ? (order.timestamp as Timestamp).toDate()
                 : order.timestamp as DateTime;
+
             if (DateFormat('yyyy-MM-dd').format(dateTime) == today) {
               total += order.totalAmount;
             }
           }
         }
+
         return StatCard(
           title: 'Daily Sales',
           value: '₱${total.toStringAsFixed(2)}',
@@ -166,6 +173,7 @@ class _DashboardPageState extends State<DashboardPage> {
       },
     );
   }
+
 
   Widget _buildProductsCard() {
     return StreamBuilder<QuerySnapshot>(
@@ -187,28 +195,36 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildAnnualSalesCard() {
-    return StreamBuilder<List<MyOrder>>(
-      stream: orderController.getOrdersForSeller(sellerId),
-      builder: (context, snapshot) {
-        double total = 0;
-        final currentYear = DateTime.now().year;
-        if (snapshot.hasData) {
-          for (var order in snapshot.data!) {
-            final dateTime = order.timestamp is Timestamp
-                ? (order.timestamp as Timestamp).toDate()
-                : order.timestamp as DateTime;
-            if (dateTime.year == currentYear) {
-              total += order.totalAmount;
-            }
+  return StreamBuilder<List<MyOrder>>(
+    stream: orderController.getOrdersForSeller(sellerId),
+    builder: (context, snapshot) {
+      double total = 0;
+      final currentYear = DateTime.now().year;
+
+      if (snapshot.hasData) {
+        for (var order in snapshot.data!) {
+          // Skip cancelled orders
+          final status = (order.status ?? '').toString().trim().toLowerCase();
+          if (status == 'cancelled') continue;
+
+          final dateTime = order.timestamp is Timestamp
+              ? (order.timestamp as Timestamp).toDate()
+              : order.timestamp as DateTime;
+
+          if (dateTime.year == currentYear) {
+            total += order.totalAmount;
           }
         }
-        return StatCard(
-          title: 'Annual Sales',
-          value: '₱${total.toStringAsFixed(2)}',
-          icon: Icons.bar_chart,
-          iconColor: Colors.purple,
-        );
-      },
-    );
-  }
+      }
+
+      return StatCard(
+        title: 'Annual Sales',
+        value: '₱${total.toStringAsFixed(2)}',
+        icon: Icons.bar_chart,
+        iconColor: Colors.purple,
+      );
+    },
+  );
+}
+
 }
