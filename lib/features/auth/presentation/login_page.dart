@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../Services/auth_service.dart';
 import '../Services/google_auth_service.dart';
 import '../widgets/login_design.dart';
-
+import '../../dashboard/widgets/error_dialog.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -19,42 +19,51 @@ class _LoginPageState extends State<LoginPage> {
   String _message = "";
   bool _isLoading = false;
 
+  /// Email/password login
   void _login() async {
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  final result = await _authService.login(
-    _emailController.text.trim(),
-    _passwordController.text.trim(),
-  );
+    final result = await _authService.login(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
 
-  setState(() => _isLoading = false);
+    setState(() => _isLoading = false);
 
-  if (result == "admin") {
-    // ✅ Always go to Admin Dashboard if super admin
-    Navigator.pushReplacementNamed(context, '/admin-dashboard');
-  } else if (result == "seller") {
-    Navigator.pushReplacementNamed(context, '/dashboard');
-  } else {
-    setState(() => _message = result ?? "Login failed.");
+    if (result == "admin") {
+      Navigator.pushReplacementNamed(context, '/admin-dashboard');
+    } else if (result == "seller") {
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    } else {
+      setState(() => _message = result ?? "Login failed.");
+    }
   }
-}
 
-
-
+  /// Google sign-in
   void _handleGoogleSignIn() async {
     setState(() {
       _message = "";
       _isLoading = true;
     });
-    final result = await _googleAuthService.signInWithGoogle();
+
+    // 👇 Pass desired role (adjust to 'buyer' if this login page is for buyers)
+    final result =
+        await _googleAuthService.signInWithGoogle(desiredRole: 'seller');
+
     setState(() => _isLoading = false);
 
     if (result == "NEW_ACCOUNT" || result == "SET_PASSWORD") {
       Navigator.pushNamed(context, '/create-password');
     } else if (result == "LOGIN_SUCCESS") {
       Navigator.pushReplacementNamed(context, '/dashboard');
+    } else if (result == "ACCOUNT_EXISTS") {
+        await showAccountExistsDialog(context);
+    } else if (result != null && result.startsWith("ERROR")) {
+      setState(() => _message = result);
+    } else if (result == "CANCELLED") {
+      setState(() => _message = "Google sign-in cancelled.");
     } else {
-      setState(() => _message = result ?? "Google sign-in failed.");
+      setState(() => _message = "Google sign-in failed.");
     }
   }
 
@@ -68,7 +77,7 @@ class _LoginPageState extends State<LoginPage> {
           gradient: LinearGradient(
             colors: [
               Color.fromRGBO(110, 198, 255, 1),
-              Color.fromRGBO(13, 71, 161, 1)
+              Color.fromRGBO(13, 71, 161, 1),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

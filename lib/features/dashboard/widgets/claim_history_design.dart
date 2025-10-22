@@ -73,7 +73,7 @@ class ClaimHistoryDesign {
                 ),
             ],
           ),
-          label: "${tab['label']} ($count)",
+          label: "${tab['label']}",
         );
       }),
     );
@@ -227,7 +227,7 @@ class ClaimHistoryDesign {
               if (order.status.toLowerCase() != 'shipped')
                 TextButton.icon(
                   icon: const Icon(Icons.local_shipping, color: Colors.blue),
-                  label: const Text("Ship"),
+                  label: const Text("Complete"),
                   onPressed: onShip,
                 ),
               if (order.status.toLowerCase() != 'cancelled')

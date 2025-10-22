@@ -12,7 +12,7 @@ class MyOrder {
   final DateTime timestamp;
   final String? notes;
   final String? paymentMethod; // ✅ now properly wired
-  
+
   // 🔹 Buyer details
   final String? buyerId;
   final String? buyerFirstName;
@@ -20,7 +20,10 @@ class MyOrder {
   final String? buyerAddress;
   final String? buyerPhone;
   final String? buyerEmail;
+
+  // 🔹 Flags
   final bool seenBySeller;
+  final bool seenNotification; // 👈 new field
 
   MyOrder({
     required this.id,
@@ -33,7 +36,7 @@ class MyOrder {
     required this.status,
     required this.timestamp,
     this.notes,
-    this.paymentMethod, // ✅ added to constructor
+    this.paymentMethod,
     required this.buyerId,
     required this.buyerFirstName,
     required this.buyerLastName,
@@ -41,6 +44,7 @@ class MyOrder {
     required this.buyerPhone,
     required this.buyerEmail,
     this.seenBySeller = false,
+    this.seenNotification = false, // 👈 default false
   });
 
   factory MyOrder.fromMap(String id, Map<String, dynamic> data) {
@@ -60,7 +64,7 @@ class MyOrder {
           : DateTime.now(),
 
       notes: data['notes'],
-      paymentMethod: data['paymentMethod'], // ✅ map it from Firestore
+      paymentMethod: data['paymentMethod'],
       buyerId: data['buyerId'],
       buyerFirstName: data['buyerFirstName'],
       buyerLastName: data['buyerLastName'],
@@ -68,6 +72,7 @@ class MyOrder {
       buyerPhone: data['buyerPhone'],
       buyerEmail: data['buyerEmail'],
       seenBySeller: data['seenBySeller'] ?? false,
+      seenNotification: data['seenNotification'] ?? false, // 👈 map from Firestore
     );
   }
 }

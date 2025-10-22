@@ -66,6 +66,7 @@ class OrderController {
     }
   }
 
+
   /// 🔹 Batch mark multiple orders as seen (prevents lag)
   Future<void> markOrdersAsSeenBatch(String sellerId, List<MyOrder> orders) async {
     final batch = _firestore.batch();
@@ -115,6 +116,17 @@ Future<void> updateStatus(
         .delete();
   }
 
+
+  
+    /// 🔹 Mark a single order as seen in the notification feed
+  Future<void> markOrderSeenInNotification(String sellerId, String orderId) async {
+    await _firestore
+        .collection('sellers')
+        .doc(sellerId)
+        .collection('orders')
+        .doc(orderId)
+        .update({'seenNotification': true});
+  }
   /// 🔹 Mark single order as seen
   Future<void> markAsSeen(String sellerId, String orderId) async {
     await _firestore
@@ -125,3 +137,5 @@ Future<void> updateStatus(
         .update({'seenBySeller': true});
   }
 }
+
+

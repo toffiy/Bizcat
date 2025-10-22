@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/dash_item.dart';
 import '../controllers/dashboard_controller.dart';
 import '../../auth/Services/auth_service.dart';
@@ -9,67 +10,68 @@ import '../../auth/Services/auth_service.dart';
 /// ----------------------
 PreferredSizeWidget buildDashboardAppBar({
   required BuildContext context,
-  required String sellerId,
   required AuthService authService,
   required DashboardController controller,
 }) {
+  final currentUser = FirebaseAuth.instance.currentUser;
+
   return AppBar(
     backgroundColor: Colors.white,
-    elevation: 0,
-    automaticallyImplyLeading: false, // ✅ removes the back button
+    elevation: 2,
+    shadowColor: Colors.black.withOpacity(0.05),
+    automaticallyImplyLeading: false,
     title: const Text(
       'Seller Dashboard',
       style: TextStyle(
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w700,
+        fontSize: 20,
         color: Colors.black87,
         letterSpacing: 0.5,
       ),
     ),
     centerTitle: true,
     actions: [
-      StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('sellers')
-            .doc(sellerId)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final data = snapshot.data!.data() as Map<String, dynamic>;
-            final imageUrl = data['profileImageUrl'];
+      if (currentUser != null)
+        StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('sellers')
+              .doc(currentUser.uid) // 👈 same as ProfilePage
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data!.exists) {
+              final data = snapshot.data!.data() as Map<String, dynamic>;
+              final imageUrl = (data['profileImageUrl'] ?? '').toString();
 
-            return IconButton(
-              icon: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.grey[300],
-                backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                    ? NetworkImage(imageUrl)
-                    : null,
-                child: imageUrl == null || imageUrl.isEmpty
-                    ? const Icon(Icons.person, color: Colors.white, size: 20)
-                    : null,
-              ),
-              onPressed: () {
-                controller.handleNavigation(context, 'Profile');
-              },
-            );
-          } else {
-            return IconButton(
-              icon: const CircleAvatar(
-                radius: 18,
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: GestureDetector(
+                  onTap: () => controller.handleNavigation(context, 'Profile'),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey.shade200,
+                    backgroundImage:
+                        imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                    child: imageUrl.isEmpty
+                        ? const Icon(Icons.person,
+                            color: Colors.grey, size: 22)
+                        : null,
+                  ),
+                ),
+              );
+            }
+            return const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: CircleAvatar(
+                radius: 20,
                 backgroundColor: Colors.indigo,
                 child: Icon(Icons.person, color: Colors.white, size: 20),
               ),
-              onPressed: () {
-                controller.handleNavigation(context, 'Profile');
-              },
             );
-          }
-        },
-      ),
+          },
+        ),
     ],
   );
 }
-
 
 /// ----------------------
 /// STAT CARD
@@ -93,11 +95,11 @@ class StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: highlight
             ? LinearGradient(
-                colors: [iconColor.withOpacity(0.15), Colors.white],
+                colors: [iconColor.withOpacity(0.2), Colors.white],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
@@ -106,50 +108,51 @@ class StatCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.06),
-            blurRadius: 10,
-            spreadRadius: 1,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: iconColor.withOpacity(0.15),
-            child: Icon(icon, color: iconColor, size: 20),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                // ✅ Auto-shrink large numbers
+                // ✅ Value (number)
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
                     value,
                     style: TextStyle(
-                      fontSize: highlight ? 20 : 18, // smaller font
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3,
+                      fontSize: highlight ? 22 : 20,
+                      fontWeight: FontWeight.bold,
                       color: highlight ? iconColor : Colors.black87,
                     ),
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
+                // ✅ Title (label) slightly bigger
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 12, // smaller title font
-                    color: Colors.grey,
+                  style: TextStyle(
+                    fontSize: 14, // bumped up from 12
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade700,
                     letterSpacing: 0.2,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -179,39 +182,63 @@ class DashboardQuickActionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
       onTap: onTap,
+      splashColor: Colors.lightBlue.withOpacity(0.1),
+      highlightColor: Colors.transparent,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.white, // neutral card background
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.06),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 8,
-              offset: const Offset(0, 3),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
-            Icon(item.icon, size: 26, color: Colors.black87),
-            const SizedBox(width: 16),
+            // 🔹 Icon container with light blue accent
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.lightBlue.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                item.icon,
+                size: 24,
+                color: Colors.lightBlue.shade600,
+              ),
+            ),
+
+            const SizedBox(width: 18),
+
+            // 🔹 Title text
             Expanded(
               child: Text(
                 item.title,
                 style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.2,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
                 ),
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+
+            // 🔹 Trailing arrow
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: Colors.grey.shade400,
+            ),
           ],
         ),
       ),

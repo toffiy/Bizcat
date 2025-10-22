@@ -21,9 +21,17 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
     {'label': 'All', 'icon': Icons.all_inbox},
     {'label': 'Pending', 'icon': Icons.hourglass_bottom},
     {'label': 'Paid', 'icon': Icons.attach_money},
-    {'label': 'Shipped', 'icon': Icons.local_shipping},
+    {'label': 'Completed', 'icon': Icons.local_shipping}, // maps to shipped
     {'label': 'Cancelled', 'icon': Icons.cancel},
   ];
+
+  final Map<String, String> statusMap = {
+    'All': 'all',
+    'Pending': 'pending',
+    'Paid': 'paid',
+    'Completed': 'shipped', // ✅ map Completed → shipped
+    'Cancelled': 'cancelled',
+  };
 
   @override
   void initState() {
@@ -81,29 +89,37 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
       );
     } else {
       // ✅ Default confirmation for other statuses
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Confirm Action'),
-            content: Text('Are you sure you want to mark this order as "$newStatus"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('No'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
-                onPressed: () {
-                  Navigator.pop(context);
-                  orderController.updateStatus(sellerId!, orderId, newStatus);
-                },
-                child: const Text('Yes'),
-              ),
-            ],
-          );
-        },
-      );
+            showDialog(
+          context: context,
+          builder: (context) {
+            // 👇 Decide the message based on newStatus
+            String message;
+            if (newStatus.toLowerCase() == 'shipped') {
+              message = 'Are you sure you want to mark this order as complete?';
+            } else {
+              message = 'Are you sure you want to mark this order as "$newStatus"?';
+            }
+
+            return AlertDialog(
+              title: const Text('Confirm Action'),
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('No'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    orderController.updateStatus(sellerId!, orderId, newStatus);
+                  },
+                  child: const Text('Yes'),
+                ),
+              ],
+            );
+          },
+        );
     }
   }
 
@@ -125,19 +141,24 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
         // ✅ Badge counts only for unseen orders
         final Map<String, int> statusCounts = {
           'All': allOrders
-              .where((o) => o.status.toLowerCase() != 'cancelled' && !o.seenBySeller)
+              .where((o) =>
+                  o.status.toLowerCase() != 'cancelled' && !o.seenBySeller)
               .length,
           'Pending': allOrders
-              .where((o) => o.status.toLowerCase() == 'pending' && !o.seenBySeller)
+              .where((o) =>
+                  o.status.toLowerCase() == 'pending' && !o.seenBySeller)
               .length,
           'Paid': allOrders
-              .where((o) => o.status.toLowerCase() == 'paid' && !o.seenBySeller)
+              .where(
+                  (o) => o.status.toLowerCase() == 'paid' && !o.seenBySeller)
               .length,
-          'Shipped': allOrders
-              .where((o) => o.status.toLowerCase() == 'shipped' && !o.seenBySeller)
+          'Completed': allOrders
+              .where(
+                  (o) => o.status.toLowerCase() == 'shipped' && !o.seenBySeller)
               .length,
           'Cancelled': allOrders
-              .where((o) => o.status.toLowerCase() == 'cancelled' && !o.seenBySeller)
+              .where((o) =>
+                  o.status.toLowerCase() == 'cancelled' && !o.seenBySeller)
               .length,
         };
 
@@ -145,16 +166,20 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
         final filteredOrders = allOrders.where((order) {
           final matchesSearch =
               (order.productName.toLowerCase()).contains(searchQuery) ||
-              (order.buyerFirstName?.toLowerCase() ?? '').contains(searchQuery) ||
-              (order.buyerLastName?.toLowerCase() ?? '').contains(searchQuery);
+                  (order.buyerFirstName?.toLowerCase() ?? '')
+                      .contains(searchQuery) ||
+                  (order.buyerLastName?.toLowerCase() ?? '')
+                      .contains(searchQuery);
 
           if (selectedTabIndex == 0) {
-            return matchesSearch && order.status.toLowerCase() != 'cancelled';
+            return matchesSearch &&
+                order.status.toLowerCase() != 'cancelled';
           }
 
+          final tabLabel = tabs[selectedTabIndex]['label'] as String;
+          final mappedStatus = statusMap[tabLabel]!;
           final matchesTab =
-              (order.status.toLowerCase()) ==
-              tabs[selectedTabIndex]['label'].toLowerCase();
+              (order.status.toLowerCase()) == mappedStatus;
 
           return matchesSearch && matchesTab;
         }).toList();
@@ -170,9 +195,11 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
             });
 
             // ✅ Mark orders in this tab as seen when user opens it
-            final currentTab = tabs[i]['label'].toLowerCase();
+            final tabLabel = tabs[i]['label'] as String;
+            final mappedStatus = statusMap[tabLabel]!;
             try {
-              final orders = await orderController.getOrdersOnce(sellerId!, currentTab);
+              final orders =
+                  await orderController.getOrdersOnce(sellerId!, mappedStatus);
               await orderController.markOrdersAsSeenBatch(sellerId!, orders);
             } catch (e) {
               debugPrint("Error marking orders as seen: $e");
@@ -207,23 +234,31 @@ class _ClaimHistoryPageState extends State<ClaimHistoryPage> {
                   final o = filteredOrders[i];
                   final status = o.status.toLowerCase();
 
-                  return Container(
-                    key: ValueKey(o.id),
-                    color: o.seenBySeller ? Colors.white : Colors.yellow.shade50,
-                    child: ClaimHistoryDesign.buildOrderCard(
-                      order: o,
-                      hideIfCancelled: selectedTabIndex == 0,
-                      onMarkPaid: status == 'pending'
-                          ? () => _confirmStatusChange(o.id, 'paid')
-                          : null,
-                      onShip: status == 'paid'
-                          ? () => _confirmStatusChange(o.id, 'shipped')
-                          : null,
-                      onCancel: (status == 'pending' ||
-                              status == 'paid' ||
-                              status == 'shipped')
-                          ? () => _confirmStatusChange(o.id, 'cancelled')
-                          : null,
+                  return GestureDetector(
+                    onTap: () {
+                      orderController.markAsSeen(sellerId!, o.id);
+                      // Optionally navigate to details
+                    },
+                    child: Container(
+                      key: ValueKey(o.id),
+                      color: o.seenBySeller
+                          ? Colors.white
+                          : Colors.yellow.shade50,
+                      child: ClaimHistoryDesign.buildOrderCard(
+                        order: o,
+                        hideIfCancelled: selectedTabIndex == 0,
+                        onMarkPaid: status == 'pending'
+                            ? () => _confirmStatusChange(o.id, 'paid')
+                            : null,
+                        onShip: status == 'paid'
+                            ? () => _confirmStatusChange(o.id, 'shipped')
+                            : null,
+                        onCancel: (status == 'pending' ||
+                                status == 'paid' ||
+                                status == 'shipped')
+                            ? () => _confirmStatusChange(o.id, 'cancelled')
+                            : null,
+                      ),
                     ),
                   );
                 },

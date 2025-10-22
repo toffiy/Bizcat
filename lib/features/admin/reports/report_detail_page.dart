@@ -18,98 +18,77 @@ class ReportDetailsPage extends StatefulWidget {
 }
 
 class _ReportDetailsPageState extends State<ReportDetailsPage> {
-  bool actionTaken = false; 
+  bool actionTaken = false;
 
   Future<void> _confirmAndUpdateStatus(
-  BuildContext context,
-  String newStatus,
-  String message,
-) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text("Confirm Action"),
-      content: Text("Are you sure you want to $message?"),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          child: const Text("Yes"),
-        ),
-      ],
-    ),
-  );
-
-  if (confirmed == true) {
-    // 1. Get the report data so we can include the reason
-    final reportSnap = await FirebaseFirestore.instance
-        .collection('sellers')
-        .doc(widget.sellerId)
-        .collection('reports')
-        .doc(widget.reportId)
-        .get();
-
-    final reportData = reportSnap.data() as Map<String, dynamic>? ?? {};
-    final reason = reportData['reason'] ?? 'No reason provided';
-
-    // 2. Update the report status
-    await FirebaseFirestore.instance
-        .collection('sellers')
-        .doc(widget.sellerId)
-        .collection('reports')
-        .doc(widget.reportId)
-        .update({'reviewStatus': newStatus});
-
-    // 3. Create a notification for the seller
-    final notificationsRef = FirebaseFirestore.instance
-        .collection('sellers')
-        .doc(widget.sellerId)
-        .collection('notifications');
-
-    String title;
-    String notifMessage;
-
-    if (newStatus == "send_warning") {
-      title = "Account Warning";
-      notifMessage =
-          "Your account has received a warning due to: $reason. Please review and take corrective action.";
-    } else if (newStatus == "suspend_account") {
-      title = "Account Suspended";
-      notifMessage =
-          "Your account has been suspended due to: $reason. Please contact support for further details.";
-    } else if (newStatus == "resolved") {
-      title = "Report Resolved";
-      notifMessage =
-          "The report against your account (Reason: $reason) has been marked as resolved.";
-    } else {
-      title = "Report Update";
-      notifMessage = "An update has been made to your account report.";
-    }
-
-    await notificationsRef.add({
-      'type': newStatus,
-      'title': title,
-      'message': notifMessage,
-      'reason': reason, 
-      'reportId': widget.reportId,
-      'createdAt': FieldValue.serverTimestamp(),
-      'read': false,
-    });
-
-    setState(() {
-      actionTaken = true;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Report updated to $newStatus and notification sent")),
+    BuildContext context,
+    String newStatus,
+    String message,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Confirm Action"),
+        content: Text("Are you sure you want to $message?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("Yes"),
+          ),
+        ],
+      ),
     );
-  }
-}
 
+    if (confirmed == true) {
+      final reportSnap = await FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(widget.sellerId)
+          .collection('reports')
+          .doc(widget.reportId)
+          .get();
+
+      final reportData = reportSnap.data() as Map<String, dynamic>? ?? {};
+      final reason = reportData['reason'] ?? 'No reason provided';
+
+      await FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(widget.sellerId)
+          .collection('reports')
+          .doc(widget.reportId)
+          .update({'reviewStatus': newStatus});
+
+      if (newStatus == "send_warning") {
+        final notificationsRef = FirebaseFirestore.instance
+            .collection('sellers')
+            .doc(widget.sellerId)
+            .collection('notifications');
+
+        await notificationsRef.add({
+          'type': newStatus,
+          'title': "Account Warning",
+          'message':
+              "Your account has received a warning due to: $reason. Please review and take corrective action.",
+          'reason': reason,
+          'reportId': widget.reportId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'read': false,
+        });
+      }
+
+      setState(() {
+        actionTaken = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Report updated to $newStatus")),
+      );
+    }
+  }
 
   Future<void> _confirmEscalate(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -133,28 +112,12 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
 
     if (confirmed == true) {
-      // Update status
       await FirebaseFirestore.instance
           .collection('sellers')
           .doc(widget.sellerId)
           .collection('reports')
           .doc(widget.reportId)
           .update({'reviewStatus': 'suspend_account'});
-
-      // Create suspension notification
-      await FirebaseFirestore.instance
-          .collection('sellers')
-          .doc(widget.sellerId)
-          .collection('notifications')
-          .add({
-        'type': 'suspend_account',
-        'title': "Account Suspended",
-        'message':
-            "Your account has been suspended due to repeated or severe violations. Please contact support for further details.",
-        'reportId': widget.reportId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'read': false,
-      });
 
       setState(() {
         actionTaken = true;
@@ -195,11 +158,21 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
               "${data['sellerFirstName'] ?? ''} ${data['sellerLastName'] ?? ''}".trim();
           final reason = data['reason'] ?? 'No reason';
           final description = data['description'] ?? 'No description';
-          final buyerId = data['buyerId'] ?? 'Unknown Buyer';
+
+          // Build buyer name flexibly
+          String buyerName = "Unknown Buyer";
+          if (data.containsKey('buyerFirstName') || data.containsKey('buyerLastName')) {
+            buyerName =
+                "${data['buyerFirstName'] ?? ''} ${data['buyerLastName'] ?? ''}".trim();
+          } else if (data['buyerName'] != null) {
+            buyerName = data['buyerName'];
+          }
+
+          final buyerEmail = data['buyerEmail'] ?? 'No email';
+
           final reviewStatus = data['reviewStatus'] ?? 'under_review';
           final evidence = List<String>.from(data['evidence'] ?? []);
 
-          // Format createdAt safely
           String createdAtStr = "No date";
           final createdAt = data['createdAt'];
           if (createdAt != null && createdAt is Timestamp) {
@@ -248,7 +221,8 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Buyer ID: $buyerId"),
+                        Text("Buyer Name: $buyerName"),
+                        Text("Buyer Email: $buyerEmail"),
                         Text("Time: $createdAtStr"),
                         Text(
                           "Status: $statusLabel",
@@ -336,7 +310,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                   ),
                 ],
 
-                const SizedBox(height: 32),
+                                const SizedBox(height: 32),
 
                 // Action buttons
                 if (reviewStatus == 'under_review') ...[

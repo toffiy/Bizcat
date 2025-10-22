@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../controllers/dashboard_controller.dart';
-import '../../auth/Services/auth_service.dart';
-import '../controllers/order_controller.dart';
-import '../models/dash_item.dart';
 import 'package:intl/intl.dart';
+
+import '../controllers/dashboard_controller.dart';
+import '../controllers/order_controller.dart';
+import '../../auth/Services/auth_service.dart';
+import '../models/dash_item.dart';
 import '../models/order.dart';
 import '../widgets/dashboard_design.dart';
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
-import '../widgets/notification.dart'; // ✅ your top notification helper
-import 'notification_page.dart'; // ✅ the popup notification window
+import '../widgets/notification.dart'; // ✅ top notification helper
+import 'notification_page.dart'; // ✅ popup notification window
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -26,25 +26,25 @@ class _DashboardPageState extends State<DashboardPage> {
 
   final String sellerId = FirebaseAuth.instance.currentUser!.uid;
 
-  final List<DashboardItem> quickActions = [
-    DashboardItem(title: 'Product Catalog', icon: Icons.inventory),
-    DashboardItem(title: 'Customer List', icon: Icons.people),
-    DashboardItem(title: 'QR Code Generator', icon: Icons.qr_code),
-    DashboardItem(title: 'Claim History', icon: Icons.history),
-    DashboardItem(title: 'Sales Reports', icon: Icons.bar_chart),
-    DashboardItem(title: 'Live Control', icon: Icons.live_tv),
-  ];
+final List<DashboardItem> quickActions = [
+  DashboardItem(title: 'Product Catalog', icon: Icons.inventory),
+  DashboardItem(title: 'Customer List', icon: Icons.people),
+  DashboardItem(title: 'QR Code Generator', icon: Icons.qr_code),
+  DashboardItem(title: 'Claim History', icon: Icons.history),
+  DashboardItem(title: 'Sales Reports', icon: Icons.bar_chart),
+  DashboardItem(title: 'Live Control', icon: Icons.live_tv),
+];
+
+
 
   int _previousOrderCount = 0;
-  
+
   @override
   void initState() {
     super.initState();
     controller.monitorSellerStatus(context, sellerId);
   }
 
-
- 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,66 +58,108 @@ class _DashboardPageState extends State<DashboardPage> {
                 .collection('sellers')
                 .doc(sellerId)
                 .collection('notifications')
-                .where('read', isEqualTo: false)
                 .snapshots(),
-            builder: (context, snapshot) {
-              int unreadCount =
-                  snapshot.hasData ? snapshot.data!.docs.length : 0;
+            builder: (context, notifSnap) {
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('sellers')
+                    .doc(sellerId)
+                    .collection('orders')
+                    .snapshots(),
+                builder: (context, orderSnap) {
+                  int unreadNotifCount = 0;
+                  int unseenOrderCount = 0;
 
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications),
-                    
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => NotificationWindow(sellerId: sellerId),
-                      );
-                    },
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                  if (notifSnap.hasData) {
+                    unreadNotifCount = notifSnap.data!.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return data['read'] != true;
+                    }).length;
+                  }
+
+                  if (orderSnap.hasData) {
+                    unseenOrderCount = orderSnap.data!.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return data['seenNotification'] != true;
+                    }).length;
+                  }
+
+                  int totalUnread = unreadNotifCount + unseenOrderCount;
+
+                  return Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.notifications),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => NotificationWindow(sellerId: sellerId),
+                          );
+                        },
+                      ),
+                      if (totalUnread > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '$totalUnread',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                ],
+                    ],
+                  );
+                },
               );
             },
           ),
 
-          // 👤 Profile Avatar
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () {
-                controller.handleNavigation(context, "Profile");
-              },
-              child: const CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.blueGrey,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-            ),
+          // 👤 Profile Avatar from Firestore
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('sellers')
+                .doc(sellerId)
+                .snapshots(),
+            builder: (context, snapshot) {
+              String? imageUrl;
+              if (snapshot.hasData && snapshot.data!.exists) {
+                final data = snapshot.data!.data() as Map<String, dynamic>;
+                imageUrl = (data['profileImageUrl'] ?? '').toString();
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: GestureDetector(
+                  onTap: () {
+                    controller.handleNavigation(context, "Profile");
+                  },
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.grey.shade200,
+                    backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
+                        ? NetworkImage(imageUrl)
+                        : null,
+                    child: (imageUrl == null || imageUrl.isEmpty)
+                        ? const Icon(Icons.person, color: Colors.grey)
+                        : null,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -169,6 +211,9 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  /// ----------------------
+  /// STATS GRID
+  /// ----------------------
   Widget _buildStatsGrid(BuildContext context) {
     return GridView(
       shrinkWrap: true,
@@ -254,7 +299,7 @@ class _DashboardPageState extends State<DashboardPage> {
           .snapshots(),
       builder: (context, snapshot) {
         final count = snapshot.data?.docs.length ?? 0;
-        return StatCard(
+             return StatCard(
           title: 'Products',
           value: '$count',
           icon: Icons.inventory_2,

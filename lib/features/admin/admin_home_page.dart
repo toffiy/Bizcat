@@ -232,7 +232,7 @@ Widget _buildReportsList() {
         itemCount: docs.length,
         itemBuilder: (context, index) {
           final data = docs[index].data() as Map<String, dynamic>;
-          final sellerName = data['sellerName'] ?? 'Unknown Seller';
+          final sellerEmail = data['sellerEmail'] ?? 'Unknown Seller';
           final sellerId = data['sellerId'] ?? '';
 
           return ListTile(
@@ -242,7 +242,9 @@ Widget _buildReportsList() {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(data['description'] ?? ''),
-                Text("Reported Seller: $sellerName (ID: $sellerId)",
+                Text("Reported Seller: $sellerEmail",
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text("ID: $sellerId",
                     style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
@@ -311,7 +313,7 @@ Widget _buildSuspendedSellersList() {
 
           final action = data['action'] ?? 'Log Entry';
           final user = data['user'] ?? '';
-          final sellerName = data['sellerName'] ?? 'Unknown Seller';
+          final sellerEmail = data['sellerName'] ?? 'Unknown Seller';
           final sellerId = data['sellerId'] ?? '';
 
           // Build a richer subtitle
@@ -319,13 +321,13 @@ Widget _buildSuspendedSellersList() {
           if (action.toLowerCase().contains('suspend') ||
               action.toLowerCase().contains('ban')) {
             subtitleText =
-                "Seller banned: $sellerName";
+                "Seller banned: $sellerEmail";
           } else if (action.toLowerCase().contains('unban') ||
               action.toLowerCase().contains('unsuspend')) {
             subtitleText =
-                "Seller unbanned: $sellerName";
+                "Seller unbanned: $sellerEmail";
           } else {
-            subtitleText = "$user • Seller: $sellerName";
+            subtitleText = "$user • Seller: $sellerEmail";
           }
 
           return ListTile(
@@ -352,9 +354,9 @@ Widget _buildSuspendedSellersList() {
   Widget build(BuildContext context) {
     return GridView.count(
       crossAxisCount: 2,
-      padding: const EdgeInsets.all(16),
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
+      padding: const EdgeInsets.all(13),
+      crossAxisSpacing: 5,
+      mainAxisSpacing: 5,
       children: [
         _buildMetricCard(
           title: "Total Sellers",

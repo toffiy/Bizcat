@@ -7,62 +7,90 @@ class SellerDetailPage extends StatelessWidget {
 
   const SellerDetailPage({super.key, required this.sellerId});
 
-  Future<void> _toggleSellerStatus(
-      BuildContext context, String currentStatus, String sellerName) async {
-    final newStatus = currentStatus == 'active' ? 'suspended' : 'active';
+ Future<void> _toggleSellerStatus(
+    BuildContext context, String currentStatus, String sellerName) async {
+  final newStatus = currentStatus == 'active' ? 'suspended' : 'active';
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(newStatus == 'suspended'
-            ? "Suspend Seller"
-            : "Reactivate Seller"),
-        content: Text(
-            "Are you sure you want to set $sellerName’s status to '$newStatus'?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text("Cancel"),
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(newStatus == 'suspended'
+          ? "Suspend Seller"
+          : "Reactivate Seller"),
+      content: Text(
+          "Are you sure you want to set $sellerName’s status to '$newStatus'?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor:
+                newStatus == 'suspended' ? Colors.red : Colors.green,
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  newStatus == 'suspended' ? Colors.red : Colors.green,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(newStatus == 'suspended' ? "Suspend" : "Reactivate"),
-          ),
-        ],
-      ),
-    );
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(newStatus == 'suspended' ? "Suspend" : "Reactivate"),
+        ),
+      ],
+    ),
+  );
 
-    if (confirm == true) {
-      // 🔹 Update seller status
-      await FirebaseFirestore.instance
-          .collection('sellers')
-          .doc(sellerId)
-          .update({'status': newStatus});
+  if (confirm == true) {
+    // 🔹 Update seller status
+    await FirebaseFirestore.instance
+        .collection('sellers')
+        .doc(sellerId)
+        .update({'status': newStatus});
 
-      // 🔹 Add log entry with seller info
-      await FirebaseFirestore.instance
-          .collection('sellers')
-          .doc(sellerId)
-          .collection('logs')
-          .add({
-        'action': newStatus == 'suspended'
-            ? 'Seller suspended'
-            : 'Seller reactivated',
-        'sellerId': sellerId,
-        'sellerName': sellerName,
-        'timestamp': FieldValue.serverTimestamp(),
-        'localTimestamp': DateTime.now(),
+    // 🔹 Add log entry with seller info
+    await FirebaseFirestore.instance
+        .collection('sellers')
+        .doc(sellerId)
+        .collection('logs')
+        .add({
+      'action': newStatus == 'suspended'
+          ? 'Seller suspended'
+          : 'Seller reactivated',
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'timestamp': FieldValue.serverTimestamp(),
+      'localTimestamp': DateTime.now(),
+    });
+
+    // 🔹 Create notification for seller
+    final notificationsRef = FirebaseFirestore.instance
+        .collection('sellers')
+        .doc(sellerId)
+        .collection('notifications');
+
+    if (newStatus == 'suspended') {
+      await notificationsRef.add({
+        'type': 'suspend_account',
+        'title': "Account Suspended",
+        'message':
+            "Your account has been suspended due to policy violations. You cannot access the platform until it is reactivated.",
+        'createdAt': FieldValue.serverTimestamp(),
+        'read': false,
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Seller status updated to $newStatus")),
-      );
+    } else {
+      await notificationsRef.add({
+        'type': 'reactivate_account',
+        'title': "Account Reactivated",
+        'message':
+            "Your account has been reactivated. You may now continue using the platform.",
+        'createdAt': FieldValue.serverTimestamp(),
+        'read': false,
+      });
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Seller status updated to $newStatus")),
+    );
   }
+}
+
+
 
   @override
   Widget build(BuildContext context) {
