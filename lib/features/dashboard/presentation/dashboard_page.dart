@@ -9,7 +9,8 @@ import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../widgets/dashboard_design.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
-import '../widgets/notification.dart'; // ✅ import the helper
+import '../widgets/notification.dart'; // ✅ your top notification helper
+import 'notification_page.dart'; // ✅ the popup notification window
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -35,16 +36,87 @@ class _DashboardPageState extends State<DashboardPage> {
   ];
 
   int _previousOrderCount = 0;
+  
+  @override
+  void initState() {
+    super.initState();
+    controller.monitorSellerStatus(context, sellerId);
+  }
 
+
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
-      appBar: buildDashboardAppBar(
-        context: context,
-        sellerId: sellerId,
-        authService: authService,
-        controller: controller,
+      appBar: AppBar(
+        title: const Text("Dashboard"),
+        actions: [
+          // 🔔 Notification Bell with Badge
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('sellers')
+                .doc(sellerId)
+                .collection('notifications')
+                .where('read', isEqualTo: false)
+                .snapshots(),
+            builder: (context, snapshot) {
+              int unreadCount =
+                  snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications),
+                    
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => NotificationWindow(sellerId: sellerId),
+                      );
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+
+          // 👤 Profile Avatar
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: () {
+                controller.handleNavigation(context, "Profile");
+              },
+              child: const CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.blueGrey,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -150,7 +222,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
         if (snapshot.hasData) {
           for (var order in snapshot.data!) {
-            // Skip cancelled orders
             final status = (order.status ?? '').toString().trim().toLowerCase();
             if (status == 'cancelled') continue;
 
@@ -174,7 +245,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-
   Widget _buildProductsCard() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -195,36 +265,34 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildAnnualSalesCard() {
-  return StreamBuilder<List<MyOrder>>(
-    stream: orderController.getOrdersForSeller(sellerId),
-    builder: (context, snapshot) {
-      double total = 0;
-      final currentYear = DateTime.now().year;
+    return StreamBuilder<List<MyOrder>>(
+      stream: orderController.getOrdersForSeller(sellerId),
+      builder: (context, snapshot) {
+        double total = 0;
+        final currentYear = DateTime.now().year;
 
-      if (snapshot.hasData) {
-        for (var order in snapshot.data!) {
-          // Skip cancelled orders
-          final status = (order.status ?? '').toString().trim().toLowerCase();
-          if (status == 'cancelled') continue;
+        if (snapshot.hasData) {
+          for (var order in snapshot.data!) {
+            final status = (order.status ?? '').toString().trim().toLowerCase();
+            if (status == 'cancelled') continue;
 
-          final dateTime = order.timestamp is Timestamp
-              ? (order.timestamp as Timestamp).toDate()
-              : order.timestamp as DateTime;
+            final dateTime = order.timestamp is Timestamp
+                ? (order.timestamp as Timestamp).toDate()
+                : order.timestamp as DateTime;
 
-          if (dateTime.year == currentYear) {
-            total += order.totalAmount;
+            if (dateTime.year == currentYear) {
+              total += order.totalAmount;
+            }
           }
         }
-      }
 
-      return StatCard(
-        title: 'Annual Sales',
-        value: '₱${total.toStringAsFixed(2)}',
-        icon: Icons.bar_chart,
-        iconColor: Colors.purple,
-      );
-    },
-  );
-}
-
+        return StatCard(
+          title: 'Annual Sales',
+          value: '₱${total.toStringAsFixed(2)}',
+          icon: Icons.bar_chart,
+          iconColor: Colors.purple,
+        );
+      },
+    );
+  }
 }

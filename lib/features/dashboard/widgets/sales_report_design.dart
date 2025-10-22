@@ -167,7 +167,7 @@ class SalesReportDesign extends StatelessWidget {
     final paidOrdersCount = filteredOrders
         .where((o) =>
             o.status.toLowerCase() == "paid" ||
-            o.status.toLowerCase() == "completed")
+            o.status.toLowerCase() == "shipped")
         .length;
 
     return Column(

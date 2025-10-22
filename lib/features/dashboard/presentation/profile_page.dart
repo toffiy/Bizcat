@@ -103,40 +103,38 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Widget _buildProfileImage() {
-    return GestureDetector(
-      onTap: _pickAndUploadImage,
-      child: Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.grey.shade300, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipOval(
-          child: profileImageUrl != null
-              ? Image.network(
-                  profileImageUrl!,
-                  width: 120,
-                  height: 120,
-                  fit: BoxFit.cover,
-                )
-              : Image.asset(
-                  'lib/assets/default_avatar.png',
-                  width: 120,
-                  height: 120,
-                  fit: BoxFit.cover,
-                ),
-        ),
+   Widget _buildProfileImage() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: profileImageUrl != null
+            ? Image.network(
+                profileImageUrl!,
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+              )
+            : Image.asset(
+                'lib/assets/default_avatar.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+              ),
       ),
     );
   }
+
 
   Widget _buildActionButton({
     required String label,

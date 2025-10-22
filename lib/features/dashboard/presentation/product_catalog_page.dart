@@ -6,7 +6,7 @@ import 'trash_page.dart';
 
 // Widgets
 import '../widgets/product_card.dart';
-import '../widgets/top_selling_card.dart'; // ✅ make sure this matches your widget file
+import '../widgets/top_selling_card.dart';
 import '../widgets/add_product_dialog.dart';
 import '../widgets/edit_product_dialog.dart';
 
@@ -20,9 +20,9 @@ class ProductCatalogPage extends StatefulWidget {
 class _ProductCatalogPageState extends State<ProductCatalogPage> {
   final ProductController _controller = ProductController();
 
-  // 📊 Highlights state
   List<Map<String, dynamic>> topSelling = [];
   bool loadingHighlights = true;
+  bool _addingProduct = false; 
 
   @override
   void initState() {
@@ -40,14 +40,18 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
   }
 
   // ✅ Show Add Product Dialog
- void _showAddProductDialog() {
-  AddProductDialog.show(context, (name, qty, price, image) async {
-    final imageUrl = await _controller.uploadImageToCloudinary(image);
-    await _controller.addProduct(name, qty, price, imageUrl);
-    _loadHighlights();
-  });
-}
+  Future<void> _showAddProductDialog() async {
+    if (_addingProduct) return;
+    setState(() => _addingProduct = true);
 
+    await AddProductDialog.show(context, (name, qty, price, image) async {
+      final imageUrl = await _controller.uploadImageToCloudinary(image);
+      await _controller.addProduct(name, qty, price, imageUrl);
+      _loadHighlights();
+    });
+
+    if (mounted) setState(() => _addingProduct = false);
+  }
 
   // ✅ Show Edit Product Dialog
   void _showEditProductDialog(String id, Map<String, dynamic> data) {
@@ -71,6 +75,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
   Future<void> _confirmDelete(String id, Map<String, dynamic> data) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text("Move to Trash"),
         content: const Text(
@@ -97,7 +102,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text("Product moved to Trash"),
-            behavior: SnackBarBehavior.floating, // ✅ bottom floating style
+            behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 2),
           ),
@@ -113,7 +118,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
         title: const Text("Product Catalog"),
         actions: [
           IconButton(
-            onPressed: _showAddProductDialog,
+            onPressed: _addingProduct ? null : _showAddProductDialog,
             icon: const Icon(Icons.add),
             tooltip: "Add Product",
           ),
@@ -155,14 +160,6 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                         ),
                       ),
                       Spacer(),
-                      Text(
-                        "View All",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -178,7 +175,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                         name: product['productName'] ?? '',
                         sold: product['totalQty'] ?? 0,
                         revenue: (product['totalRevenue'] as num).toDouble(),
-                        imageUrl: product['imageUrl'],               
+                        imageUrl: product['imageUrl'],
                       );
                     },
                   ),

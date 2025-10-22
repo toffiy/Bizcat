@@ -20,24 +20,26 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   void _login() async {
-    setState(() => _isLoading = true);
-    final error = await _authService.login(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
-    if (error != null) {
-      setState(() {
-        _message = error;
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
-        _message = "Login successful ✅";
-        _isLoading = false;
-      });
-      Navigator.pushReplacementNamed(context, '/dashboard');
-    }
+  setState(() => _isLoading = true);
+
+  final result = await _authService.login(
+    _emailController.text.trim(),
+    _passwordController.text.trim(),
+  );
+
+  setState(() => _isLoading = false);
+
+  if (result == "admin") {
+    // ✅ Always go to Admin Dashboard if super admin
+    Navigator.pushReplacementNamed(context, '/admin-dashboard');
+  } else if (result == "seller") {
+    Navigator.pushReplacementNamed(context, '/dashboard');
+  } else {
+    setState(() => _message = result ?? "Login failed.");
   }
+}
+
+
 
   void _handleGoogleSignIn() async {
     setState(() {

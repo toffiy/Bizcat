@@ -54,10 +54,19 @@ class _LiveControlPageState extends State<LiveControlPage> with WidgetsBindingOb
     }
   }
 
-  bool isValidFacebookLiveUrl(String url) {
-    final pattern = RegExp(r'^https?:\/\/(www\.)?facebook\.com\/.*(live|videos|share|watch\/live).*');
+  bool isValidLiveUrl(String url) {
+    final pattern = RegExp(
+      r'^https?:\/\/(www\.)?('
+      r'facebook\.com\/.*(live|share|watch\/live).*' // Facebook
+      r'|tiktok\.com\/(@[A-Za-z0-9._-]+\/live|live\/.*)' // TikTok full live
+      r'|vt\.tiktok\.com\/[A-Za-z0-9]+\/?' // TikTok short links
+      r')',
+      caseSensitive: false,
+    );
     return pattern.hasMatch(url.trim());
   }
+
+
 
   Future<void> _goLive() async {
     final link = _liveLinkController.text.trim();
@@ -65,15 +74,15 @@ class _LiveControlPageState extends State<LiveControlPage> with WidgetsBindingOb
     if (link.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please paste your Facebook Live link')),
+        const SnackBar(content: Text('Please paste your Live link')),
       );
       return;
     }
 
-    if (!isValidFacebookLiveUrl(link)) {
+    if (!isValidLiveUrl(link)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid Facebook Live URL format')),
+        const SnackBar(content: Text('Invalid Live URL format')),
       );
       return;
     }
@@ -165,7 +174,7 @@ Future<void> _endLiveAndHideAll() async {
                 TextField(
                   controller: _liveLinkController,
                   decoration: const InputDecoration(
-                    labelText: 'Facebook Live Link',
+                    labelText: 'Live Link',
                     hintText: 'https://facebook.com/yourpage/live',
                   ),
                 ),

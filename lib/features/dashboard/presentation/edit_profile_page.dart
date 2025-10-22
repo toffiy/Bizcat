@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../auth/services/cloudinary_service.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -59,9 +59,56 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _isSaving = false);
   }
 
+  Future<void> _confirmPickImage() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Change Profile Picture"),
+        content: const Text("Do you want to select a new profile picture?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Yes, Change"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _pickImage();
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
+
+    // 🔹 Show confirmation dialog before saving
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Update Profile"),
+        content: const Text("Are you sure you want to update your profile?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Yes, Update"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
 
     setState(() => _isSaving = true);
 
@@ -76,7 +123,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'profileImageUrl': _profileImageUrl,
       });
 
-      Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile updated successfully")),
+        );
+      }
     } catch (e) {
       debugPrint('Error saving profile: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,9 +166,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Profile Avatar
+                    // Profile Avatar with confirmation
                     GestureDetector(
-                      onTap: _pickImage,
+                      onTap: _confirmPickImage,
                       child: Stack(
                         alignment: Alignment.bottomRight,
                         children: [
@@ -128,12 +180,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     as ImageProvider,
                           ),
                           Container(
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.blueAccent,
                               shape: BoxShape.circle,
                             ),
                             padding: const EdgeInsets.all(6),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                            child: const Icon(Icons.camera_alt,
+                                color: Colors.white, size: 20),
                           ),
                         ],
                       ),
@@ -185,10 +238,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         if (v == null || v.trim().isEmpty) {
                           return "Enter email";
                         }
-                     if (!RegExp(r'^[\w.-]+@([\w-]+\.)+[a-zA-Z]{2,}$').hasMatch(v)) {
-  return "Enter a valid email";
-}
-
+                        if (!RegExp(r'^[\w.-]+@([\w-]+\.)+[a-zA-Z]{2,}$')
+                            .hasMatch(v)) {
+                          return "Enter a valid email";
+                        }
                         return null;
                       },
                       onSaved: (v) => _email = v!.trim(),

@@ -21,9 +21,9 @@ class SalesChartDesign extends StatelessWidget {
 
   String _labelFor(int value) {
     if (selectedDay != null) {
-      // Format as 12-hour time with AM/PM
-      final dt = DateTime(0, 1, 1, value); // dummy date with given hour
-      return DateFormat.j().format(dt); // e.g. "6 PM", "10 AM"
+  
+      final dt = DateTime(0, 1, 1, value); 
+      return DateFormat.j().format(dt); 
     }
     if (selectedMonth != null) return value.toString();
     if (value >= 1 && value <= 12) {
@@ -51,7 +51,7 @@ class SalesChartDesign extends StatelessWidget {
     // Only include PAID/COMPLETED orders
     for (var o in filteredOrders.where((o) {
       final s = o.status.toLowerCase();
-      return s == "paid" || s == "completed";
+      return s == "paid" || s == "shipped";
     })) {
       final date = toDate(o.timestamp);
       final key = selectedDay != null

@@ -3,11 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 
 // Screens
 import 'features/auth/presentation/login_page.dart';
-import 'features/auth/presentation/register_page.dart';
 import 'features/dashboard/presentation/dashboard_page.dart';
 import 'features/auth/presentation/create_password.dart';
 import 'features/auth/presentation/splash_screen.dart';
 import 'features/auth/presentation/forgot_password.dart';
+import 'features/admin/admin_home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,9 +44,9 @@ class MyApp extends StatelessWidget {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginPage(),
         '/forgot-password': (context) => const ForgotPasswordPage(),
-        '/register': (context) => const RegisterPage(),
-        '/dashboard': (context) => const DashboardPage(),
+        '/dashboard': (context) => const DashboardPage(), // seller dashboard
         '/create-password': (context) => const CreatePasswordPage(),
+        '/admin-dashboard': (context) => const AdminHomePage(), // ✅ new admin dashboard
       },
     );
   }

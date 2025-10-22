@@ -40,7 +40,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
     return orders
         .where((o) =>
             o.status.toLowerCase() == "paid" ||
-            o.status.toLowerCase() == "completed")
+            o.status.toLowerCase() == "shipped")
         .map((o) => _toDate(o.timestamp).year)
         .toSet()
         .toList()
@@ -52,7 +52,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
     return orders
         .where((o) =>
             (o.status.toLowerCase() == "paid" ||
-                o.status.toLowerCase() == "completed") &&
+                o.status.toLowerCase() == "shipped") &&
             _toDate(o.timestamp).year == selectedYear)
         .map((o) => _toDate(o.timestamp).month)
         .toSet()
@@ -65,6 +65,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
     return orders
         .where((o) =>
             (o.status.toLowerCase() == "paid" ||
+             o.status.toLowerCase() == "shipped" ||
                 o.status.toLowerCase() == "completed") &&
             _toDate(o.timestamp).year == selectedYear &&
             _toDate(o.timestamp).month == selectedMonth)
@@ -79,7 +80,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
     return orders.where((o) {
       final date = _toDate(o.timestamp);
       final status = o.status.toLowerCase();
-      final isFulfilled = status == "paid" || status == "completed";
+      final isFulfilled = status == "paid" || status == "shipped";
       if (!isFulfilled) return false;
       if (selectedYear != null && date.year != selectedYear) return false;
       if (selectedMonth != null && date.month != selectedMonth) return false;

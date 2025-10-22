@@ -14,14 +14,11 @@ import '../models/product.dart';
 class ProductController {
   final _firestore = FirebaseFirestore.instance;
 
-  // 🔹 Compress image dynamically to stay under targetKB
     Future<XFile> compressImageToJpgUnderKB(XFile file, int targetKB) async {
       final dir = await getTemporaryDirectory();
 
-      // Always start with a unique temp file name
       String targetPath = '${dir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      // Skip if already small enough
       final originalSizeKB = await File(file.path).length() / 1024;
       if (originalSizeKB <= targetKB) return file;
 
@@ -29,7 +26,6 @@ class ProductController {
       const int minQuality = 10;
       const int minDimension = 512;
 
-      // Convert to JPEG first if needed (different path!)
       if (!file.path.toLowerCase().endsWith('.jpg') &&
           !file.path.toLowerCase().endsWith('.jpeg')) {
         final convertedPath = '${dir.path}/converted_${DateTime.now().millisecondsSinceEpoch}.jpg';
@@ -43,7 +39,6 @@ class ProductController {
         file = XFile(converted.path);
       }
 
-      // Get dimensions
       final bytes = await file.readAsBytes();
       final decodedImage = img.decodeImage(bytes);
       if (decodedImage == null) throw Exception("Could not decode image.");
@@ -53,7 +48,6 @@ class ProductController {
       XFile? compressedFile;
 
       do {
-        // Always generate a new target path for each iteration
         targetPath = '${dir.path}/compressed_${DateTime.now().microsecondsSinceEpoch}.jpg';
 
         final result = await FlutterImageCompress.compressAndGetFile(
@@ -79,7 +73,6 @@ class ProductController {
           if (width < minDimension || height < minDimension) break;
         }
 
-        // Update file for next loop iteration
         file = compressedFile;
 
       } while (true);
@@ -88,9 +81,7 @@ class ProductController {
     }
 
 
-  // ✅ Upload image to Cloudinary (with compression if > targetKB)
   Future<String> uploadImageToCloudinary(XFile imageFile, {int targetKB = 900}) async {
-    // Ensure JPG and under targetKB
     imageFile = await compressImageToJpgUnderKB(imageFile, targetKB);
 
     final cloudName = 'ddpj3pix5';
@@ -114,7 +105,6 @@ class ProductController {
     }
   }
 
-  // ✅ Add product (reject negative price)
   Future<void> addProduct(
     String name,
     int quantity,
@@ -130,7 +120,6 @@ class ProductController {
 
     final sellerId = user.uid;
 
-    // 🔍 Check for duplicate product name (case-insensitive)
     final existing = await _firestore
         .collection('sellers')
         .doc(sellerId)
@@ -169,7 +158,6 @@ class ProductController {
     });
   }
 
-  // ✅ Check if product exists
   Future<bool> productExists(String name, String sellerId) async {
     final query = await FirebaseFirestore.instance
         .collection('products')

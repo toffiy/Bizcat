@@ -36,28 +36,31 @@ class GoogleAuthService {
       final docRef = _firestore.collection('users').doc(user.uid);
       final doc = await docRef.get();
 
-      if (!doc.exists) {
-        // New account → create record and ask for password
-        await docRef.set({
-          'email': user.email,
-          'firstName': user.displayName?.split(' ').first ?? '',
-          'lastName': user.displayName?.split(' ').skip(1).join(' ') ?? '',
-          'role': 'seller',
-          'createdAt': FieldValue.serverTimestamp(),
-          'googleSignIn': true,
-          'hasPassword': false, // track password status
-        });
+          if (!doc.exists) {
+          // New account → create record and ask for password
+          await docRef.set({
+            'email': user.email,
+            'firstName': user.displayName?.split(' ').first ?? '',
+            'lastName': user.displayName?.split(' ').skip(1).join(' ') ?? '',
+            'role': 'seller',
+            'createdAt': FieldValue.serverTimestamp(),
+            'googleSignIn': true,
+            'hasPassword': false, // track password status
+            'status': 'active',   // ✅ added status
+          });
 
-        await _firestore.collection('sellers').doc(user.uid).set({
-          'sellerId': user.uid,
-          'email': user.email,
-          'firstName': user.displayName?.split(' ').first ?? '',
-          'lastName': user.displayName?.split(' ').skip(1).join(' ') ?? '',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+          await _firestore.collection('sellers').doc(user.uid).set({
+            'sellerId': user.uid,
+            'email': user.email,
+            'firstName': user.displayName?.split(' ').first ?? '',
+            'lastName': user.displayName?.split(' ').skip(1).join(' ') ?? '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'status': 'active',   // ✅ added status
+          });
 
-        return "NEW_ACCOUNT";
-      } else {
+          return "NEW_ACCOUNT";
+        }
+        else {
         // Existing account → check if password is set
         final data = doc.data() ?? {};
         final hasPassword = data['hasPassword'] == true;

@@ -15,7 +15,6 @@ class CustomerController {
         .collection('sellers')
         .doc(sellerId)
         .collection('orders')
-        .orderBy('lastUpdated', descending: true)
         .snapshots()
         .map((snapshot) {
       final Map<String, CustomerWithStats> buyersMap = {};
@@ -66,7 +65,6 @@ class CustomerController {
         buyerStats.ordersCount += 1;
         buyerStats.totalSpent += price * quantity;
 
-        // If this order is more recent than the stored last order, update last purchase info
         if (lastUpdated != null) {
           if (buyerStats.lastOrderDate == null ||
               lastUpdated.isAfter(buyerStats.lastOrderDate!)) {
@@ -79,6 +77,24 @@ class CustomerController {
       return buyersMap.values.toList();
     });
   }
+
+  /// Stream of last 5 orders for a given customer
+  Stream<List<Map<String, dynamic>>> getRecentOrdersForCustomer(String customerEmail) {
+    final sellerId = FirebaseAuth.instance.currentUser?.uid;
+    if (sellerId == null) {
+      return Stream.value([]);
+    }
+
+     //✅ Version B (fallback, no index required)
+     return _firestore
+         .collection('sellers')
+         .doc(sellerId)
+        .collection('orders')
+        .where('buyerEmail', isEqualTo: customerEmail)
+        .limit(5)
+        .snapshots()
+       .map((snapshot) => snapshot.docs.map((d) => d.data()).toList());
+  }
 }
 
 class CustomerWithStats {
@@ -86,7 +102,7 @@ class CustomerWithStats {
   int ordersCount;
   double totalSpent;
   DateTime? lastOrderDate;
-  double lastPurchaseAmount; // ✅ New field
+  double lastPurchaseAmount;
 
   CustomerWithStats({
     required this.customer,

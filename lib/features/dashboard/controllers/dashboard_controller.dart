@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Import pages with aliases to avoid naming conflicts
 import '../presentation/product_catalog_page.dart';
@@ -7,10 +8,44 @@ import '../presentation/Claim_history_Page.dart' as claim;
 import '../presentation/sales_report_page.dart' as sales;
 import '../presentation/live_control_page.dart';
 import '../presentation/profile_page.dart';
+import '../presentation/qr_generator_page.dart';
 import '../services/seller_service.dart';
-import '../presentation/qr_generator_page.dart'; // ⬅️ Added import here
+import '../presentation/blocked_screen.dart';
 
 class DashboardController {
+  /// ----------------------
+  /// Monitor Seller Status
+  /// ----------------------
+  /// Call this in DashboardPage.initState()
+      void monitorSellerStatus(BuildContext context, String sellerId) {
+      FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(sellerId)
+          .snapshots()
+          .listen((doc) {
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          final status = data['status']; // ✅ matches your Firestore field
+
+          debugPrint("Seller status: $status"); // 👀 log to console for debugging
+
+          if (status == 'suspended') {
+            // Delay navigation until after build to avoid context issues
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const BlockedScreen()),
+                (route) => false,
+              );
+            });
+          }
+        }
+      });
+    }
+
+
+  /// ----------------------
+  /// Handle Navigation
+  /// ----------------------
   void handleNavigation(BuildContext context, String title) {
     switch (title) {
       case 'Product Catalog':
@@ -49,7 +84,6 @@ class DashboardController {
         });
         break;
 
-
       case 'Claim History':
         Navigator.push(
           context,
@@ -71,7 +105,7 @@ class DashboardController {
         );
         break;
 
-      case 'Profile': // ⬅️ New Profile case
+      case 'Profile':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ProfilePage()),

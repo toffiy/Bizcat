@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// Screens
 import 'login_page.dart';
 import 'package:bizcat/features/dashboard/presentation/dashboard_page.dart';
+import 'package:bizcat/features/admin/admin_home_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,20 +22,59 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Adjust duration to match your GIF length
     Timer(const Duration(seconds: 3), () {
-      final user = FirebaseAuth.instance.currentUser;
+      _checkUserRole();
+    });
+  }
 
-      if (user != null) {
-        // Already logged in → go to dashboard
+  Future<void> _checkUserRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      // Not logged in → go to login
+      Navigator.of(context).pushReplacement(
+        _createFadeRoute(const LoginPage()),
+      );
+      return;
+    }
+
+    final uid = user.uid;
+
+    try {
+      // 🔹 Check if UID is in admin collection
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('admin')
+          .doc(uid)
+          .get();
+
+      if (adminDoc.exists) {
+        Navigator.of(context).pushReplacement(
+          _createFadeRoute(const AdminHomePage()),
+        );
+        return;
+      }
+
+      // 🔹 Otherwise check sellers
+      final sellerDoc = await FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(uid)
+          .get();
+
+      if (sellerDoc.exists) {
         Navigator.of(context).pushReplacement(
           _createFadeRoute(const DashboardPage()),
         );
       } else {
-        // Not logged in → go to login
+        // fallback if user exists but no role
         Navigator.of(context).pushReplacement(
           _createFadeRoute(const LoginPage()),
         );
       }
-    });
+    } catch (e) {
+      // In case of error, go back to login
+      Navigator.of(context).pushReplacement(
+        _createFadeRoute(const LoginPage()),
+      );
+    }
   }
 
   /// Custom fade transition

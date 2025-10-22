@@ -36,26 +36,39 @@ class AuthService {
   }
 
   // ===== LOGIN =====
-  Future<String?> login(String email, String password) async {
-    if (!isValidEmail(email)) return "Invalid email format.";
-    if (password.isEmpty) return "Password cannot be empty.";
+ Future<String?> login(String email, String password) async {
+  if (!isValidEmail(email)) return "Invalid email format.";
+  if (password.isEmpty) return "Password cannot be empty.";
 
-    try {
-      await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
-      return null;
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
-        return "Email not found. Please register first.";
-      } else if (e.code == 'wrong-password') {
-        return "Wrong password. Try again.";
-      } else {
-        return "Login failed: ${e.message}";
-      }
+  try {
+    final userCred = await _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
+
+    final uid = userCred.user!.uid;
+
+      // 🔹 Check admin first
+      final adminDoc = await _firestore.collection('admin').doc(uid).get();
+      if (adminDoc.exists) return "admin";
+
+      // 🔹 Otherwise check sellers
+      final sellerDoc = await _firestore.collection('sellers').doc(uid).get();
+      if (sellerDoc.exists) return "seller";
+
+      return "unknown";
+  } on FirebaseAuthException catch (e) {
+    if (e.code == 'user-not-found') {
+      return "Email not found. Please register first.";
+    } else if (e.code == 'wrong-password') {
+      return "Wrong password. Try again.";
+    } else {
+      return "Login failed";
     }
   }
+}
+
+
 
   // ===== REGISTER SELLER =====
 Future<String?> registerSeller({
@@ -119,7 +132,7 @@ Future<String?> registerSeller({
 }
 
 
-  // ===== RESET PASSWORD =====
+ 
   Future<String?> resetPassword(String email) async {
     if (!isValidEmail(email)) return "Invalid email format.";
 
