@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../sellers/seller_detail_page.dart';
+import '../sellers/buyer_detail_page.dart';
 
 class ReportDetailsPage extends StatefulWidget {
   final String reportId;
-  final String sellerId;
+  final String userId; // sellerId or buyerId
+  final String role;   // "Seller" or "Buyer"
 
-  const ReportDetailsPage({
+  // ❌ remove const, because arguments are runtime values
+  ReportDetailsPage({
     super.key,
     required this.reportId,
-    required this.sellerId,
+    required this.userId,
+    required this.role,
   });
 
   @override
@@ -45,27 +49,22 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
 
     if (confirmed == true) {
-      final reportSnap = await FirebaseFirestore.instance
-          .collection('sellers')
-          .doc(widget.sellerId)
+      final reportRef = FirebaseFirestore.instance
+          .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
+          .doc(widget.userId)
           .collection('reports')
-          .doc(widget.reportId)
-          .get();
+          .doc(widget.reportId);
 
+      final reportSnap = await reportRef.get();
       final reportData = reportSnap.data() as Map<String, dynamic>? ?? {};
       final reason = reportData['reason'] ?? 'No reason provided';
 
-      await FirebaseFirestore.instance
-          .collection('sellers')
-          .doc(widget.sellerId)
-          .collection('reports')
-          .doc(widget.reportId)
-          .update({'reviewStatus': newStatus});
+      await reportRef.update({'reviewStatus': newStatus});
 
       if (newStatus == "send_warning") {
         final notificationsRef = FirebaseFirestore.instance
-            .collection('sellers')
-            .doc(widget.sellerId)
+            .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
+            .doc(widget.userId)
             .collection('notifications');
 
         await notificationsRef.add({
@@ -80,13 +79,14 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
         });
       }
 
-      setState(() {
-        actionTaken = true;
-      });
-
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Report updated to $newStatus")),
       );
+
+      setState(() {
+        actionTaken = true;
+      });
     }
   }
 
@@ -96,7 +96,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
       builder: (ctx) => AlertDialog(
         title: const Text("Confirm Suspension"),
         content: const Text(
-            "Are you sure you want to escalate and suspend this seller’s account?"),
+            "Are you sure you want to suspend this account? This will update their status to 'suspended'."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -105,7 +105,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Yes"),
+            child: const Text("Yes, Suspend"),
           ),
         ],
       ),
@@ -113,30 +113,45 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
 
     if (confirmed == true) {
       await FirebaseFirestore.instance
-          .collection('sellers')
-          .doc(widget.sellerId)
+          .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
+          .doc(widget.userId)
           .collection('reports')
           .doc(widget.reportId)
           .update({'reviewStatus': 'suspend_account'});
 
+      await FirebaseFirestore.instance
+          .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
+          .doc(widget.userId)
+          .update({'status': 'suspended'});
+
+      if (!mounted) return;
       setState(() {
         actionTaken = true;
       });
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => SellerDetailPage(sellerId: widget.sellerId),
-        ),
-      );
+      if (widget.role == 'Seller') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SellerDetailPage(sellerId: widget.userId),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BuyerDetailPage(buyerId: widget.userId),
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final reportRef = FirebaseFirestore.instance
-        .collection('sellers')
-        .doc(widget.sellerId)
+        .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
+        .doc(widget.userId)
         .collection('reports')
         .doc(widget.reportId);
 
@@ -153,21 +168,19 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
-
           final sellerName =
               "${data['sellerFirstName'] ?? ''} ${data['sellerLastName'] ?? ''}".trim();
           final reason = data['reason'] ?? 'No reason';
           final description = data['description'] ?? 'No description';
 
-          // Build buyer name flexibly
           String buyerName = "Unknown Buyer";
-          if (data.containsKey('buyerFirstName') || data.containsKey('buyerLastName')) {
+          if (data.containsKey('buyerFirstName') ||
+              data.containsKey('buyerLastName')) {
             buyerName =
                 "${data['buyerFirstName'] ?? ''} ${data['buyerLastName'] ?? ''}".trim();
           } else if (data['buyerName'] != null) {
             buyerName = data['buyerName'];
           }
-
           final buyerEmail = data['buyerEmail'] ?? 'No email';
 
           final reviewStatus = data['reviewStatus'] ?? 'under_review';
@@ -208,13 +221,12 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
             padding: const EdgeInsets.all(16),
             child: ListView(
               children: [
-                // Seller summary card
                 Card(
                   margin: const EdgeInsets.only(bottom: 16),
                   child: ListTile(
                     leading: const Icon(Icons.store, color: Colors.blue),
                     title: Text(
-                      sellerName,
+                      sellerName.isEmpty ? "Unknown User" : sellerName,
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 18),
                     ),
@@ -235,7 +247,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                     ),
                   ),
                 ),
-                // Reason
+
                 Text("Reason:",
                     style: TextStyle(
                         fontSize: 16,
@@ -247,7 +259,6 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                         fontSize: 20, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 16),
 
-                // Description
                 Text("Description:",
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold)),
@@ -256,17 +267,16 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                     style: const TextStyle(fontSize: 18, height: 1.4)),
                 const SizedBox(height: 24),
 
-                // Evidence
                 if (evidence.isNotEmpty) ...[
                   const Text("Evidence:",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 160,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      children: evidence.map((url) {
+                                            children: evidence.map((url) {
                         return GestureDetector(
                           onTap: () {
                             Navigator.push(
@@ -310,9 +320,9 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                   ),
                 ],
 
-                                const SizedBox(height: 32),
+                const SizedBox(height: 32),
 
-                // Action buttons
+                // 🔹 Action buttons
                 if (reviewStatus == 'under_review') ...[
                   ElevatedButton.icon(
                     onPressed: () => _confirmAndUpdateStatus(
@@ -331,7 +341,8 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                   ElevatedButton.icon(
                     onPressed: () => _confirmEscalate(context),
                     icon: const Icon(Icons.person_off, color: Colors.white),
-                    label: const Text("Suspend Seller"),
+                    // ⚠️ remove const here, widget.role is runtime
+                    label: Text("Suspend ${widget.role}"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -365,3 +376,5 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
   }
 }
+
+                      

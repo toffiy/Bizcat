@@ -1,10 +1,15 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+
 import '../models/customer.dart';
 
 class CustomerController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  /// Stream of customers with aggregated order stats
   Stream<List<CustomerWithStats>> getCustomersWithOrders() {
     final sellerId = FirebaseAuth.instance.currentUser?.uid;
     if (sellerId == null) {
@@ -79,21 +84,94 @@ class CustomerController {
   }
 
   /// Stream of last 5 orders for a given customer
-  Stream<List<Map<String, dynamic>>> getRecentOrdersForCustomer(String customerEmail) {
+  Stream<List<Map<String, dynamic>>> getRecentOrdersForCustomer(
+      String customerEmail) {
     final sellerId = FirebaseAuth.instance.currentUser?.uid;
     if (sellerId == null) {
       return Stream.value([]);
     }
 
-     //✅ Version B (fallback, no index required)
-     return _firestore
-         .collection('sellers')
-         .doc(sellerId)
+    return _firestore
+        .collection('sellers')
+        .doc(sellerId)
         .collection('orders')
         .where('buyerEmail', isEqualTo: customerEmail)
         .limit(5)
         .snapshots()
-       .map((snapshot) => snapshot.docs.map((d) => d.data()).toList());
+        .map((snapshot) => snapshot.docs.map((d) => d.data()).toList());
+  }
+
+  /// Report a buyer with reason, description, and evidence (images).
+  Future<void> reportBuyer({
+    required String buyerId,
+    required String buyerEmail,
+    required String buyerName,
+    required String reason,
+    required String description,
+    required List<File> evidenceFiles, // local image files
+  }) async {
+    final seller = FirebaseAuth.instance.currentUser;
+    if (seller == null) throw Exception("Not logged in");
+
+    final sellerId = seller.uid;
+
+    // 🔹 Upload evidence to Cloudinary
+    final List<String> evidenceUrls = [];
+    for (final file in evidenceFiles) {
+      final url = await _uploadToCloudinary(file);
+      if (url != null) evidenceUrls.add(url);
+    }
+
+    // 🔹 Fetch seller profile info
+    final sellerSnap =
+        await _firestore.collection("sellers").doc(sellerId).get();
+    final sellerData = sellerSnap.data() ?? {};
+
+    final sellerInfo = {
+      "sellerEmail": sellerData["email"] ?? seller.email,
+      "sellerFirstName": sellerData["firstName"] ?? "",
+      "sellerLastName": sellerData["lastName"] ?? "",
+    };
+
+    // 🔹 Save report in Firestore
+    await _firestore
+        .collection("sellers")
+        .doc(sellerId)
+        .collection("reports")
+        .add({
+      "sellerId": sellerId,
+      ...sellerInfo,
+      "buyerId": buyerId,
+      "buyerEmail": buyerEmail,
+      "buyerName": buyerName,
+      "reason": reason,
+      "description": description,
+      "evidence": evidenceUrls,
+      "createdAt": FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Helper: Upload image to Cloudinary
+  Future<String?> _uploadToCloudinary(File file) async {
+    const cloudName = "ddpj3pix5";
+    const uploadPreset = "bizcat_unsigned";
+
+    final uri =
+        Uri.parse("https://api.cloudinary.com/v1_1/$cloudName/image/upload");
+
+    final request = http.MultipartRequest("POST", uri)
+      ..fields["upload_preset"] = uploadPreset
+      ..files.add(await http.MultipartFile.fromPath("file", file.path));
+
+    final response = await request.send();
+    if (response.statusCode == 200) {
+      final resStr = await response.stream.bytesToString();
+      final data = json.decode(resStr);
+      return data["secure_url"];
+    } else {
+      print("Cloudinary upload failed: ${response.statusCode}");
+      return null;
+    }
   }
 }
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Admin tabs
-import 'sellers/sellers_page.dart';
+import 'sellers/users_page.dart';
 import 'reports/reports_page.dart';
 import 'logs/logs_page.dart';
 import 'settings/admin_settings_page.dart';
@@ -19,7 +19,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   final List<String> _titles = [
     "Dashboard",
-    "Manage Sellers",
+    "Manage Accounts",
     "Customer Reports",
     "Audit Logs",
     "Admin Settings",
@@ -27,7 +27,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   late final List<Widget> _pages = [
     const AdminDashboardPage(),
-    SellersPage(),
+    UsersPage(),
     ReportsPage(),
     LogsPage(),
     AdminSettingsPage(),
@@ -50,7 +50,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Sellers'),
+          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Users'),
           BottomNavigationBarItem(icon: Icon(Icons.report), label: 'Reports'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Logs'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
@@ -66,9 +66,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
 
-  /// Count top-level docs (sellers only)
+  /// Count top-level docs (sellers or buyers)
   Stream<int> _countDocs(String collection, [String? field, String? value]) {
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance.collection(collection);
+    Query<Map<String, dynamic>> query =
+        FirebaseFirestore.instance.collection(collection);
     if (field != null && value != null) {
       query = query.where(field, isEqualTo: value);
     }
@@ -202,7 +203,7 @@ class AdminDashboardPage extends StatelessWidget {
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             return ListTile(
-              leading: const Icon(Icons.person),
+              leading: const Icon(Icons.store),
               title: Text("${data['firstName']} ${data['lastName']}"),
               subtitle: Text(data['email'] ?? ''),
               trailing: Text(data['status'] ?? 'unknown'),
@@ -213,142 +214,161 @@ class AdminDashboardPage extends StatelessWidget {
     );
   }
 
-  /// Reports list (collectionGroup)
-Widget _buildReportsList() {
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collectionGroup('reports')
-        .limit(10)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      final docs = snapshot.data!.docs;
-      if (docs.isEmpty) {
-        return const Center(child: Text("No reports found"));
-      }
-      return ListView.builder(
-        itemCount: docs.length,
-        itemBuilder: (context, index) {
-          final data = docs[index].data() as Map<String, dynamic>;
-          final sellerEmail = data['sellerEmail'] ?? 'Unknown Seller';
-          final sellerId = data['sellerId'] ?? '';
+  /// Buyers list
+  Widget _buildAllBuyersList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('buyers')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text("No buyers found"));
+        return ListView.builder(
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            return ListTile(
+              leading: const Icon(Icons.person),
+              title: Text("${data['firstName']} ${data['lastName']}"),
+              subtitle: Text(data['email'] ?? ''),
+              trailing: Text(data['status'] ?? 'active'),
+            );
+          },
+        );
+      },
+    );
+  }
 
-          return ListTile(
-            leading: const Icon(Icons.report_problem, color: Colors.orange),
-            title: Text(data['title'] ?? 'Report'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data['description'] ?? ''),
-                Text("Reported Seller: $sellerEmail",
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                Text("ID: $sellerId",
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+  /// Suspended Accounts list (sellers + buyers)
+  Widget _buildSuspendedAccountsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collectionGroup('users') // if you store both sellers & buyers under "users"
+          .where('status', isEqualTo: 'suspended')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text("No suspended accounts found"));
+        return ListView.builder(
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            return ListTile(
+              leading: const Icon(Icons.block, color: Colors.red),
+              title: Text("${data['firstName']} ${data['lastName']}"),
+              subtitle: Text(data['email'] ?? ''),
+              trailing: Text(
+                data['status'] ?? 'unknown',
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
-/// Suspended Sellers list
-Widget _buildSuspendedSellersList() {
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('sellers')
-        .where('status', isEqualTo: 'suspended')
-        .snapshots(), // removed orderBy for now
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return const Center(child: Text("No suspended sellers found"));
-      }
+    /// Reports list
+  Widget _buildReportsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collectionGroup('reports')
+          .limit(10)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text("No reports found"));
+        }
+        return ListView.builder(
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final sellerEmail = data['sellerEmail'] ?? 'Unknown Seller';
+            final sellerId = data['sellerId'] ?? '';
+            final reason = data['reason'] ?? 'Report';
+            final description = data['description'] ?? '';
 
-      final docs = snapshot.data!.docs;
-      return ListView.builder(
-        itemCount: docs.length,
-        itemBuilder: (context, index) {
-          final data = docs[index].data() as Map<String, dynamic>;
-          return ListTile(
-            leading: const Icon(Icons.block, color: Colors.red),
-            title: Text("${data['firstName']} ${data['lastName']}"),
-            subtitle: Text(data['email'] ?? ''),
-            trailing: Text(
-              data['status'] ?? 'unknown',
-              style: const TextStyle(color: Colors.red),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+            return ListTile(
+              leading: const Icon(Icons.report_problem, color: Colors.orange),
+              title: Text(reason),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(description),
+                  Text("Reported Seller: $sellerEmail",
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text("ID: $sellerId",
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
+  /// Logs list
+  Widget _buildLogsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collectionGroup('logs')
+          .limit(10)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text("No logs found"));
+        }
+        return ListView.builder(
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final action = data['action'] ?? 'Log Entry';
+            final user = data['user'] ?? '';
+            final sellerEmail = data['sellerName'] ?? 'Unknown Seller';
 
-  /// Logs list (collectionGroup)
- Widget _buildLogsList() {
-  return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collectionGroup('logs')
-        .limit(10)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      final docs = snapshot.data!.docs;
-      if (docs.isEmpty) {
-        return const Center(child: Text("No logs found"));
-      }
-      return ListView.builder(
-        itemCount: docs.length,
-        itemBuilder: (context, index) {
-          final data = docs[index].data() as Map<String, dynamic>;
+            // Build a richer subtitle
+            String subtitleText = user;
+            if (action.toLowerCase().contains('suspend') ||
+                action.toLowerCase().contains('ban')) {
+              subtitleText = "Seller banned: $sellerEmail";
+            } else if (action.toLowerCase().contains('unban') ||
+                action.toLowerCase().contains('unsuspend')) {
+              subtitleText = "Seller unbanned: $sellerEmail";
+            } else {
+              subtitleText = "$user • Seller: $sellerEmail";
+            }
 
-          final action = data['action'] ?? 'Log Entry';
-          final user = data['user'] ?? '';
-          final sellerEmail = data['sellerName'] ?? 'Unknown Seller';
-          final sellerId = data['sellerId'] ?? '';
-
-          // Build a richer subtitle
-          String subtitleText = user;
-          if (action.toLowerCase().contains('suspend') ||
-              action.toLowerCase().contains('ban')) {
-            subtitleText =
-                "Seller banned: $sellerEmail";
-          } else if (action.toLowerCase().contains('unban') ||
-              action.toLowerCase().contains('unsuspend')) {
-            subtitleText =
-                "Seller unbanned: $sellerEmail";
-          } else {
-            subtitleText = "$user • Seller: $sellerEmail";
-          }
-
-          return ListTile(
-            leading: Icon(
-              action.toLowerCase().contains('suspend') ||
-                      action.toLowerCase().contains('ban')
-                  ? Icons.block
-                  : Icons.check_circle,
-              color: action.toLowerCase().contains('suspend') ||
-                      action.toLowerCase().contains('ban')
-                  ? Colors.red
-                  : Colors.green,
-            ),
-            title: Text(action),
-            subtitle: Text(subtitleText),
-          );
-        },
-      );
-    },
-  );
-}
+            return ListTile(
+              leading: Icon(
+                action.toLowerCase().contains('suspend') ||
+                        action.toLowerCase().contains('ban')
+                    ? Icons.block
+                    : Icons.check_circle,
+                color: action.toLowerCase().contains('suspend') ||
+                        action.toLowerCase().contains('ban')
+                    ? Colors.red
+                    : Colors.green,
+              ),
+              title: Text(action),
+              subtitle: Text(subtitleText),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -367,18 +387,26 @@ Widget _buildSuspendedSellersList() {
           dialogContent: _buildAllSellersList(),
         ),
         _buildMetricCard(
-          title: "Suspended Sellers",
+          title: "Total Buyers",
+          purpose: "All registered buyers in the system",
+          icon: Icons.people,
+          stream: _countDocs("buyers"),
+          color: Colors.green,
+          dialogContent: _buildAllBuyersList(),
+        ),
+        _buildMetricCard(
+          title: "Suspended Accounts",
           purpose: "Accounts restricted due to violations",
           icon: Icons.block,
-          stream: _countDocs("sellers" , "status" , "suspended"),
+          stream: _countDocs("sellers", "status", "suspended"),
           color: Colors.red,
-          dialogContent: _buildSuspendedSellersList(),
+          dialogContent: _buildSuspendedAccountsList(),
         ),
-                _buildMetricCard(
+        _buildMetricCard(
           title: "Recent Reports",
           purpose: "Latest customer reports submitted",
           icon: Icons.report,
-          stream: _countReports(), // ✅ collectionGroup
+          stream: _countReports(),
           color: Colors.orange,
           dialogContent: _buildReportsList(),
         ),
@@ -386,7 +414,7 @@ Widget _buildSuspendedSellersList() {
           title: "Recent Logs",
           purpose: "Latest admin and system activities",
           icon: Icons.history,
-          stream: _countLogs(), // ✅ collectionGroup
+          stream: _countLogs(),
           color: Colors.teal,
           dialogContent: _buildLogsList(),
         ),

@@ -171,10 +171,19 @@ class ClaimHistoryDesign {
               DateFormat('MM/dd/yyyy').format(order.timestamp)),
           const SizedBox(height: 6),
 
+          // 🔹 Seller Notes (if available)
+          if (order.notes != null && order.notes!.isNotEmpty) ...[
+            const Text("Seller Notes",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            _iconText(Icons.note, order.notes!),
+            const SizedBox(height: 12),
+            const Divider(),
+          ],
+
           // Status + Payment Method badges
           Row(
             children: [
-              // Always show status badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -191,7 +200,6 @@ class ClaimHistoryDesign {
               ),
               const SizedBox(width: 8),
 
-              // Show payment method badge if Paid
               if (order.status.toLowerCase() == 'paid' &&
                   order.paymentMethod != null)
                 Container(

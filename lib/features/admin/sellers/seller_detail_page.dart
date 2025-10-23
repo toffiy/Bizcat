@@ -84,10 +84,12 @@ class SellerDetailPage extends StatelessWidget {
       });
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Seller status updated to $newStatus")),
-    );
-  }
+    if (!context.mounted) return; // ✅ prevent using a dead context
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("Seller status updated to $newStatus")),
+  );
+}
 }
 
 

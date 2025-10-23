@@ -18,6 +18,19 @@ class OrderController {
           .toList();
     });
   }
+  Stream<List<MyOrder>> getOrdersForBuyer(String buyerId) {
+  return _firestore
+      .collectionGroup('orders') // 🔹 scans all sellers/{sellerId}/orders
+      .where('buyerId', isEqualTo: buyerId)
+      .orderBy('timestamp', descending: true)
+      .snapshots()
+      .map((snapshot) {
+    return snapshot.docs
+        .map((doc) => MyOrder.fromMap(doc.id, doc.data()))
+        .toList();
+  });
+}
+
 
   /// 🔹 Get orders by status (live stream)
   Stream<List<MyOrder>> getOrdersByStatus(String sellerId, String status) {

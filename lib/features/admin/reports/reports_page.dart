@@ -253,13 +253,14 @@ class _ReportsPageState extends State<ReportsPage> {
                       ],
                     ),
                   ),
-                  onTap: () {
+                 onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => ReportDetailsPage(
                           reportId: reportId,
-                          sellerId: sellerId,
+                          userId: sellerId,   // ✅ matches constructor
+                          role: "Seller",     // ✅ required by constructor
                         ),
                       ),
                     );
