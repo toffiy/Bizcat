@@ -22,7 +22,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
 
   List<Map<String, dynamic>> topSelling = [];
   bool loadingHighlights = true;
-  bool _addingProduct = false; 
+  bool _addingProduct = false;
 
   @override
   void initState() {
@@ -33,13 +33,17 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
   Future<void> _loadHighlights() async {
     setState(() => loadingHighlights = true);
     final data = await _controller.getTopSellingProducts(limit: 5);
+
+    final filtered = data
+        .where((p) => p['productName'] != null && p['productName'] != '')
+        .toList();
+
     setState(() {
-      topSelling = data;
+      topSelling = filtered;
       loadingHighlights = false;
     });
   }
 
-  // ✅ Show Add Product Dialog
   Future<void> _showAddProductDialog() async {
     if (_addingProduct) return;
     setState(() => _addingProduct = true);
@@ -53,7 +57,6 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     if (mounted) setState(() => _addingProduct = false);
   }
 
-  // ✅ Show Edit Product Dialog
   void _showEditProductDialog(String id, Map<String, dynamic> data) {
     EditProductDialog.show(
       context,
@@ -71,7 +74,6 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     );
   }
 
-  // ✅ Confirmation before moving to Trash
   Future<void> _confirmDelete(String id, Map<String, dynamic> data) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -98,17 +100,51 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
 
     if (shouldDelete == true) {
       await _controller.moveToTrash(id, data);
+      await _loadHighlights();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text("Product moved to Trash"),
+          const SnackBar(
+            content: Text("Product moved to Trash"),
             behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 2),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
           ),
         );
       }
     }
+  }
+
+  Widget _sectionHeader(String title, {IconData? icon, Color? accent}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+      child: Row(
+        children: [
+          if (icon != null) Icon(icon, size: 18, color: accent ?? Colors.grey),
+          if (icon != null) const SizedBox(width: 6),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _accentLine({Color? color}) {
+    return Container(
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+      height: 2,
+      width: 40,
+      decoration: BoxDecoration(
+        color: color ?? Colors.blueGrey,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
   }
 
   @override
@@ -127,7 +163,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const TrashPage()),
-              );
+              ).then((_) => _loadHighlights());
             },
             icon: const Icon(Icons.delete_outline),
             tooltip: "Go to Trash",
@@ -136,7 +172,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
       ),
       body: Column(
         children: [
-          // 📊 Highlights Section
+          // 📊 Top Selling Section
           if (loadingHighlights)
             const Padding(
               padding: EdgeInsets.all(16),
@@ -146,25 +182,11 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.emoji_events, color: Colors.amber, size: 20),
-                      SizedBox(width: 6),
-                      Text(
-                        "Top Selling Products",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Spacer(),
-                    ],
-                  ),
-                ),
+                _sectionHeader("Top Selling Products",
+                    icon: Icons.emoji_events, accent: Colors.amber),
+                _accentLine(color: Colors.amber.shade400),
                 SizedBox(
-                  height: 210,
+                  height: 180,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: topSelling.length,
@@ -188,7 +210,11 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
               child: Text("No sales data yet"),
             ),
 
-          // 📦 Product List
+          // 📦 Product Catalog Section
+          _sectionHeader("Product Catalog",
+              icon: Icons.inventory_2, accent: Colors.blueGrey),
+          _accentLine(color: Colors.blueGrey),
+
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _controller.getProductsStream(),

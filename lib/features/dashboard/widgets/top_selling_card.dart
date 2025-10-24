@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 
 class TopSellingTile extends StatelessWidget {
   final int rank;
-  final String name;
-  final int sold;
-  final double revenue;
+  final String? name;
+  final int? sold;
+  final double? revenue;
   final String? imageUrl;
 
   const TopSellingTile({
     super.key,
     required this.rank,
-    required this.name,
-    required this.sold,
-    required this.revenue,
+    this.name,
+    this.sold,
+    this.revenue,
     this.imageUrl,
   });
 
@@ -25,14 +25,15 @@ class TopSellingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Only show top 3
     if (rank > 3) return const SizedBox.shrink();
 
+    final isDeleted = name == null || name!.isEmpty;
+
     return Container(
-      width: 170,
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      width: 150, // 👈 narrower card
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         gradient: LinearGradient(
           colors: [Colors.white, Colors.grey.shade50],
           begin: Alignment.topLeft,
@@ -40,9 +41,9 @@ class TopSellingTile extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: Colors.black12.withOpacity(0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -51,16 +52,16 @@ class TopSellingTile extends StatelessWidget {
         children: [
           // Rank badge
           Container(
-            margin: const EdgeInsets.only(top: 10),
-            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: _rankColor(),
               boxShadow: [
                 BoxShadow(
-                  color: _rankColor().withOpacity(0.4),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
+                  color: _rankColor().withOpacity(0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 )
               ],
             ),
@@ -69,63 +70,70 @@ class TopSellingTile extends StatelessWidget {
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 13, // smaller
               ),
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // Product image with border
+          // Product image or placeholder
           CircleAvatar(
-            radius: 34,
-            backgroundColor: _rankColor().withOpacity(0.2),
-            backgroundImage: imageUrl != null && imageUrl!.isNotEmpty
+            radius: 26, // 👈 smaller avatar
+            backgroundColor: _rankColor().withOpacity(0.15),
+            backgroundImage: (!isDeleted && imageUrl != null && imageUrl!.isNotEmpty)
                 ? NetworkImage(imageUrl!)
                 : null,
-            child: (imageUrl == null || imageUrl!.isEmpty)
-                ? const Icon(Icons.image_not_supported,
-                    size: 28, color: Colors.grey)
+            child: (isDeleted || imageUrl == null || imageUrl!.isEmpty)
+                ? const Icon(Icons.remove_circle_outline,
+                    size: 22, color: Colors.grey)
                 : null,
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // Product name
+          // Product name or placeholder
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
-              name,
-              style: const TextStyle(
+              isDeleted ? "—" : name!,
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
-                fontSize: 15,
+                fontSize: 13, // 👈 smaller font
+                color: isDeleted ? Colors.grey : Colors.black,
               ),
-              maxLines: 1,
+              maxLines: 2, // 👈 allow 2 lines
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
           ),
 
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
 
           // Stats
-          Text(
-            "Sold: $sold",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
+          if (!isDeleted) ...[
+            Text(
+              "Sold: $sold",
+              style: TextStyle(
+                fontSize: 11, // 👈 smaller
+                color: Colors.grey.shade600,
+              ),
             ),
-          ),
-          Text(
-            "₱${revenue.toStringAsFixed(2)}",
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
+            Text(
+              "₱${revenue?.toStringAsFixed(2) ?? '0.00'}",
+              style: const TextStyle(
+                fontSize: 13, // 👈 smaller
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
             ),
-          ),
+          ] else
+            const Text(
+              "No Data",
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
         ],
       ),
     );
