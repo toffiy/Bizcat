@@ -18,18 +18,23 @@ class OrderController {
           .toList();
     });
   }
-  Stream<List<MyOrder>> getOrdersForBuyer(String buyerId) {
-  return _firestore
-      .collectionGroup('orders') // 🔹 scans all sellers/{sellerId}/orders
+
+
+Stream<List<MyOrder>> getOrdersForBuyerFrom(String buyerId) {
+  return FirebaseFirestore.instance
+      .collectionGroup('orders')
       .where('buyerId', isEqualTo: buyerId)
       .orderBy('timestamp', descending: true)
       .snapshots()
       .map((snapshot) {
-    return snapshot.docs
-        .map((doc) => MyOrder.fromMap(doc.id, doc.data()))
-        .toList();
-  });
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return MyOrder.fromMap(doc.id, data);
+        }).toList();
+      });
 }
+
+
 
 
   /// 🔹 Get orders by status (live stream)

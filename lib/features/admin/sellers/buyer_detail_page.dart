@@ -198,6 +198,7 @@ class BuyerDetailPage extends StatelessWidget {
   }
 }
 
+
 class BuyerOrdersList extends StatelessWidget {
   final String buyerId;
 
@@ -208,19 +209,29 @@ class BuyerOrdersList extends StatelessWidget {
     final orderController = OrderController();
 
     return StreamBuilder<List<MyOrder>>(
-      stream: orderController.getOrdersForBuyer(buyerId),
+      stream: orderController.getOrdersForBuyerFrom(buyerId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
+        // 🔹 Handle error state
+        if (snapshot.hasError) {
+          return Center(child: Text("Error: ${snapshot.error}"));
+        }
+
+        // 🔹 Show loader while waiting for first data
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final orders = snapshot.data ?? [];
+        // 🔹 If no data yet
+        if (!snapshot.hasData) {
+          return const Center(child: Text("Loading orders..."));
+        }
 
+        final orders = snapshot.data!;
         if (orders.isEmpty) {
           return const Center(child: Text("No past orders found"));
         }
 
+        // 🔹 Render orders list
         return ListView.builder(
           itemCount: orders.length,
           itemBuilder: (context, index) {

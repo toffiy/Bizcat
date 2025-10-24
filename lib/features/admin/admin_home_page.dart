@@ -242,34 +242,66 @@ class AdminDashboardPage extends StatelessWidget {
   }
 
   /// Suspended Accounts list (sellers + buyers)
-  Widget _buildSuspendedAccountsList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collectionGroup('users') // if you store both sellers & buyers under "users"
-          .where('status', isEqualTo: 'suspended')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final docs = snapshot.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text("No suspended accounts found"));
-        return ListView.builder(
-          itemCount: docs.length,
-          itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
-            return ListTile(
-              leading: const Icon(Icons.block, color: Colors.red),
-              title: Text("${data['firstName']} ${data['lastName']}"),
-              subtitle: Text(data['email'] ?? ''),
-              trailing: Text(
-                data['status'] ?? 'unknown',
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+/// Suspended Accounts list (sellers + buyers)
+Widget _buildSuspendedAccountsList() {
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('buyers')
+        .where('status', isEqualTo: 'suspended')
+        .snapshots(),
+    builder: (context, buyerSnapshot) {
+      if (buyerSnapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('sellers')
+            .where('status', isEqualTo: 'suspended')
+            .snapshots(),
+        builder: (context, sellerSnapshot) {
+          if (sellerSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final buyerDocs = buyerSnapshot.data?.docs ?? [];
+          final sellerDocs = sellerSnapshot.data?.docs ?? [];
+          final allDocs = [...buyerDocs, ...sellerDocs];
+
+          if (allDocs.isEmpty) {
+            return const Center(child: Text("No suspended accounts found"));
+          }
+
+          return ListView.builder(
+            itemCount: allDocs.length,
+            itemBuilder: (context, index) {
+              final data = allDocs[index].data() as Map<String, dynamic>;
+
+              final firstName = data['firstName'] ?? '';
+              final lastName = data['lastName'] ?? '';
+              final email = data['email'] ?? '';
+              final status = data['status'] ?? 'unknown';
+
+              // Detect if this doc came from buyers or sellers
+              final isBuyer = buyerDocs.contains(allDocs[index]);
+
+              return ListTile(
+                leading: const Icon(Icons.block, color: Colors.red),
+                title: Text("$firstName $lastName"),
+                subtitle: Text("${isBuyer ? "Buyer" : "Seller"} • $email"),
+                trailing: Text(
+                  status,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              );
+            },
+          );
+        },
+      );
+    },
+  );
+}
+
 
     /// Reports list
   Widget _buildReportsList() {

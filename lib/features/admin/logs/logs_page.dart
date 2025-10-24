@@ -131,14 +131,18 @@ class _LogsPageState extends State<LogsPage> {
           final filteredLogs = logs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
             final action = (data['action'] ?? '').toString().toLowerCase();
-            final sellerName =
-                (data['sellerName'] ?? '').toString().toLowerCase();
+
+            final sellerName = (data['sellerName'] ?? '').toString().toLowerCase();
             final sellerId = (data['sellerId'] ?? '').toString().toLowerCase();
+            final buyerName = (data['buyerName'] ?? '').toString().toLowerCase();
+            final buyerId = (data['buyerId'] ?? '').toString().toLowerCase();
 
             final matchesSearch = _searchQuery.isEmpty ||
                 action.contains(_searchQuery) ||
                 sellerName.contains(_searchQuery) ||
-                sellerId.contains(_searchQuery);
+                sellerId.contains(_searchQuery) ||
+                buyerName.contains(_searchQuery) ||
+                buyerId.contains(_searchQuery);
 
             final matchesFilter = _selectedAction == "all" ||
                 (_selectedAction == "suspend" && action.contains("suspend")) ||
@@ -158,10 +162,18 @@ class _LogsPageState extends State<LogsPage> {
               final log = filteredLogs[index].data() as Map<String, dynamic>;
 
               final action = log['action'] ?? 'Unknown action';
-              final sellerId = log['sellerId'] ?? 'Unknown ID';
-              final sellerName = log['sellerName'] ?? 'Unknown Seller';
+
+              // 🔹 Detect whether this is a buyer log or seller log
+              final bool isBuyerLog = log.containsKey('buyerId') || log.containsKey('buyerName');
+              final String id = isBuyerLog
+                  ? (log['buyerId'] ?? 'Unknown ID')
+                  : (log['sellerId'] ?? 'Unknown ID');
+              final String name = isBuyerLog
+                  ? (log['buyerName'] ?? 'Unknown Buyer')
+                  : (log['sellerName'] ?? 'Unknown Seller');
+
               final ts = log['timestamp'] ?? log['localTimestamp'];
-              final timestamp = ts != null ? ts.toDate() : null;
+              final timestamp = ts != null && ts is Timestamp ? ts.toDate() : null;
 
               final timeStr = timestamp != null
                   ? DateFormat.yMMMd().add_jm().format(timestamp)
@@ -181,7 +193,7 @@ class _LogsPageState extends State<LogsPage> {
                     child: Icon(Icons.history, color: _actionColor(action)),
                   ),
                   title: Text(
-                    sellerName,
+                    name,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 16),
                   ),
@@ -192,7 +204,7 @@ class _LogsPageState extends State<LogsPage> {
                       children: [
                         Text("Action: $action",
                             style: const TextStyle(fontSize: 14)),
-                        Text("Seller ID: $sellerId",
+                        Text("${isBuyerLog ? "Buyer" : "Seller"} ID: $id",
                             style: const TextStyle(fontSize: 13)),
                         Text("Time: $timeStr",
                             style: const TextStyle(fontSize: 13)),
