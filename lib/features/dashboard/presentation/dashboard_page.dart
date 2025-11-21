@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 import '../controllers/dashboard_controller.dart';
 import '../controllers/order_controller.dart';
@@ -9,8 +10,8 @@ import '../../auth/Services/auth_service.dart';
 import '../models/dash_item.dart';
 import '../models/order.dart';
 import '../widgets/dashboard_design.dart';
-import '../widgets/notification.dart'; // ✅ top notification helper
-import 'notification_page.dart'; // ✅ popup notification window
+import '../widgets/notification.dart';
+import 'notification_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -26,18 +27,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
   final String sellerId = FirebaseAuth.instance.currentUser!.uid;
 
-final List<DashboardItem> quickActions = [
-  DashboardItem(title: 'Product Catalog', icon: Icons.inventory),
-  DashboardItem(title: 'Customer List', icon: Icons.people),
-  DashboardItem(title: 'QR Code Generator', icon: Icons.qr_code),
-  DashboardItem(title: 'Claim History', icon: Icons.history),
-  DashboardItem(title: 'Sales Reports', icon: Icons.bar_chart),
-  DashboardItem(title: 'Live Control', icon: Icons.live_tv),
-];
-
-
+  final List<DashboardItem> quickActions = [
+    DashboardItem(title: 'Product Catalog', icon: Icons.inventory),
+    DashboardItem(title: 'Customer List', icon: Icons.people),
+    DashboardItem(title: 'QR Code Generator', icon: Icons.qr_code),
+    DashboardItem(title: 'Claim History', icon: Icons.history),
+    DashboardItem(title: 'Sales Reports', icon: Icons.bar_chart),
+    DashboardItem(title: 'Live Control', icon: Icons.live_tv),
+  ];
 
   int _previousOrderCount = 0;
+
+  // 🔹 Category input state
+  final TextEditingController _categoryController = TextEditingController();
+  bool _savingCategory = false;
+  bool _isEditingCategory = false; // start disabled until double-tap
 
   @override
   void initState() {
@@ -52,7 +56,7 @@ final List<DashboardItem> quickActions = [
       appBar: AppBar(
         title: const Text("Dashboard"),
         actions: [
-          // 🔔 Notification Bell with Badge
+          // 🔔 Notification Bell
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('sellers')
@@ -93,7 +97,8 @@ final List<DashboardItem> quickActions = [
                         onPressed: () {
                           showDialog(
                             context: context,
-                            builder: (_) => NotificationWindow(sellerId: sellerId),
+                            builder: (_) =>
+                                NotificationWindow(sellerId: sellerId),
                           );
                         },
                       ),
@@ -124,7 +129,7 @@ final List<DashboardItem> quickActions = [
             },
           ),
 
-          // 👤 Profile Avatar from Firestore
+          // 👤 Profile Avatar
           StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('sellers')
@@ -187,7 +192,139 @@ final List<DashboardItem> quickActions = [
                 return _buildStatsGrid(context);
               },
             ),
+
             const SizedBox(height: 24),
+
+       StreamBuilder<DocumentSnapshot>(
+  stream: FirebaseFirestore.instance
+      .collection('sellers')
+      .doc(sellerId)
+      .snapshots(),
+  builder: (context, snapshot) {
+    String savedCategory = "";
+    if (snapshot.hasData && snapshot.data!.exists) {
+      final data = snapshot.data!.data() as Map<String, dynamic>;
+      savedCategory = (data['categories'] ?? '').toString();
+    }
+
+    final hasCategory = savedCategory.isNotEmpty;
+
+    // Always update controller with Firestore value if not editing
+    if (hasCategory && !_isEditingCategory) {
+      _categoryController.text = savedCategory;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Catalog Category",
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          GestureDetector(
+            onDoubleTap: () {
+              setState(() => _isEditingCategory = true);
+            },
+            child: AbsorbPointer(
+              absorbing: hasCategory && !_isEditingCategory,
+              child: TextField(
+                controller: _categoryController,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(15),
+                ],
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: (hasCategory && !_isEditingCategory)
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                ),
+                decoration: InputDecoration(
+                  hintText: "e.g. Electronics, Clothing, Food",
+                  filled: true,
+                  fillColor: (hasCategory && !_isEditingCategory)
+                      ? Colors.grey.shade100
+                      : Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // ✅ Show Save button only if:
+          // 1. No category exists (empty field), OR
+          // 2. User double‑tapped to enable editing
+          if (!hasCategory || _isEditingCategory)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.save, color: Colors.white),
+                label: const Text(
+                  "Save Category",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: _savingCategory
+                    ? null
+                    : () async {
+                        final category = _categoryController.text.trim();
+                        if (category.isEmpty) return;
+                        setState(() => _savingCategory = true);
+
+                        await FirebaseFirestore.instance
+                            .collection('sellers')
+                            .doc(sellerId)
+                            .update({'categories': category});
+
+                        setState(() {
+                          _savingCategory = false;
+                          _isEditingCategory = false; // back to disabled
+                        });
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Category saved: $category"),
+                            behavior: SnackBarBehavior.floating,
+                            margin: const EdgeInsets.all(16),
+                          ),
+                        );
+                      },
+              ),
+            ),
+        ],
+      ),
+    );
+  },
+),
+
             const Text(
               "Quick Actions",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -299,7 +436,7 @@ final List<DashboardItem> quickActions = [
           .snapshots(),
       builder: (context, snapshot) {
         final count = snapshot.data?.docs.length ?? 0;
-             return StatCard(
+        return StatCard(
           title: 'Products',
           value: '$count',
           icon: Icons.inventory_2,
@@ -341,3 +478,4 @@ final List<DashboardItem> quickActions = [
     );
   }
 }
+

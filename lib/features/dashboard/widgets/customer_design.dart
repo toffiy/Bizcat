@@ -294,9 +294,9 @@ class CustomerDetailSheet extends StatelessWidget {
                 try {
                   // Example: call your controller here
                   await CustomerController().reportBuyer(
-                    buyerId: customer.id, // from your Customer object
-                    buyerEmail: customer.email,
-                    buyerName: "${customer.firstName} ${customer.lastName}",
+                    id: customer.id, // from your Customer object
+                    email: customer.email,
+                    name: "${customer.firstName} ${customer.lastName}",
                     reason: "Did not claim order", // could be from a dropdown
                     description:
                         "Buyer repeatedly placed orders but never claimed them.",

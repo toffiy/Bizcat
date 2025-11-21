@@ -19,23 +19,20 @@ class OrderController {
     });
   }
 
-
-Stream<List<MyOrder>> getOrdersForBuyerFrom(String buyerId) {
-  return FirebaseFirestore.instance
-      .collectionGroup('orders')
-      .where('buyerId', isEqualTo: buyerId)
-      .orderBy('timestamp', descending: true)
-      .snapshots()
-      .map((snapshot) {
-        return snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return MyOrder.fromMap(doc.id, data);
-        }).toList();
-      });
-}
-
-
-
+  /// 🔹 Get all orders for a buyer (across sellers)
+  Stream<List<MyOrder>> getOrdersForBuyerFrom(String buyerId) {
+    return FirebaseFirestore.instance
+        .collectionGroup('orders')
+        .where('buyerId', isEqualTo: buyerId)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return MyOrder.fromMap(doc.id, data);
+      }).toList();
+    });
+  }
 
   /// 🔹 Get orders by status (live stream)
   Stream<List<MyOrder>> getOrdersByStatus(String sellerId, String status) {
@@ -60,7 +57,6 @@ Stream<List<MyOrder>> getOrdersForBuyerFrom(String buyerId) {
   }
 
   /// 🔹 One-time fetch of orders for a seller by status
-  /// Requires composite index: (status ASC, timestamp DESC)
   Future<List<MyOrder>> getOrdersOnce(String sellerId, String status) async {
     Query<Map<String, dynamic>> query = _firestore
         .collection('sellers')
@@ -71,21 +67,18 @@ Stream<List<MyOrder>> getOrdersForBuyerFrom(String buyerId) {
       query = query.where('status', isEqualTo: status);
     }
 
-    // ✅ Always order by timestamp (requires index if combined with where)
     final snap = await query.orderBy('timestamp', descending: true).get();
 
     final orders = snap.docs.map((d) => MyOrder.fromMap(d.id, d.data())).toList();
 
     if (status == 'all') {
-      // ✅ Exclude cancelled in memory
       return orders.where((o) => o.status.toLowerCase() != 'cancelled').toList();
     } else {
       return orders;
     }
   }
 
-
-  /// 🔹 Batch mark multiple orders as seen (prevents lag)
+  /// 🔹 Batch mark multiple orders as seen
   Future<void> markOrdersAsSeenBatch(String sellerId, List<MyOrder> orders) async {
     final batch = _firestore.batch();
     for (var o in orders.where((o) => !o.seenBySeller)) {
@@ -99,28 +92,59 @@ Stream<List<MyOrder>> getOrdersForBuyerFrom(String buyerId) {
     await batch.commit();
   }
 
-  /// 🔹 Update status of a single order
+  /// 🔹 Update status of a single order (with stock rollback on cancel)
+ /// 🔹 Update status of a single order (with quantity rollback on cancel)
 Future<void> updateStatus(
   String sellerId,
   String orderId,
   String newStatus, {
   String? paymentMethod,
 }) async {
+  final ref = _firestore
+      .collection('sellers')
+      .doc(sellerId)
+      .collection('orders')
+      .doc(orderId);
+
+  // Get the order data first
+  final snap = await ref.get();
+  final orderData = snap.data();
+  if (orderData == null) return;
+
+  final order = MyOrder.fromMap(orderId, orderData);
+
+  // Prepare update payload
   final data = {
     'status': newStatus,
     'updatedAt': DateTime.now(),
   };
 
   if (paymentMethod != null) {
-    data['paymentMethod'] = paymentMethod; // ✅ Save Cash/GCash
+    data['paymentMethod'] = paymentMethod;
   }
 
-  await _firestore
+  // Update the order status
+  await ref.update(data);
+
+  // 🔹 If cancelled → restore product quantity
+  // 🔹 If cancelled → restore product quantity
+if (newStatus.toLowerCase() == 'cancelled') {
+  final productRef = _firestore
       .collection('sellers')
-      .doc(sellerId)
-      .collection('orders')
-      .doc(orderId)
-      .update(data);
+      .doc(sellerId) // ✅ use function parameter
+      .collection('products')
+      .doc(order.productId);
+
+  await _firestore.runTransaction((txn) async {
+    final productSnap = await txn.get(productRef);
+    if (productSnap.exists) {
+      final currentQty = productSnap['quantity'] ?? 0;
+      txn.update(productRef, {
+        'quantity': currentQty + order.quantity, // add back cancelled qty
+      });
+    }
+  });
+}
 }
 
 
@@ -134,9 +158,7 @@ Future<void> updateStatus(
         .delete();
   }
 
-
-  
-    /// 🔹 Mark a single order as seen in the notification feed
+  /// 🔹 Mark order seen in notification feed
   Future<void> markOrderSeenInNotification(String sellerId, String orderId) async {
     await _firestore
         .collection('sellers')
@@ -145,6 +167,7 @@ Future<void> updateStatus(
         .doc(orderId)
         .update({'seenNotification': true});
   }
+
   /// 🔹 Mark single order as seen
   Future<void> markAsSeen(String sellerId, String orderId) async {
     await _firestore
@@ -155,5 +178,3 @@ Future<void> updateStatus(
         .update({'seenBySeller': true});
   }
 }
-
-

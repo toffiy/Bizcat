@@ -61,8 +61,8 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     EditProductDialog.show(
       context,
       name: data['name'],
-      qty: data['quantity'],
-      price: (data['price'] as num).toDouble(),
+      qty: data['quantity'] as int,
+      price: (data['price'] as num).toInt(),
       onSubmit: (name, qty, price) async {
         await _controller.updateProduct(id, {
           'name': name,

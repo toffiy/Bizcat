@@ -30,16 +30,19 @@ class _LiveControlPageState extends State<LiveControlPage> with WidgetsBindingOb
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _endLiveAndHideAll(); // Ensure cleanup on dispose
+    _liveLinkController.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
+    // 🔑 Detect background/exit and auto-end live
     if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached ||
-        state == AppLifecycleState.paused) {
-      await _endLiveAndHideAll();
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      if (_isLive) {
+        await _endLiveAndHideAll();
+      }
     }
   }
 
@@ -65,8 +68,6 @@ class _LiveControlPageState extends State<LiveControlPage> with WidgetsBindingOb
     );
     return pattern.hasMatch(url.trim());
   }
-
-
 
   Future<void> _goLive() async {
     final link = _liveLinkController.text.trim();
@@ -100,44 +101,38 @@ class _LiveControlPageState extends State<LiveControlPage> with WidgetsBindingOb
     });
   }
 
-Future<void> _endLiveAndHideAll() async {
-  try {
-    // 1️⃣ Get all products for this seller
-    final productsSnapshot = await FirebaseFirestore.instance
-        .collection('sellers')
-        .doc(userId)
-        .collection('products')
-        .get();
+  Future<void> _endLiveAndHideAll() async {
+    try {
+      final productsSnapshot = await FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(userId)
+          .collection('products')
+          .get();
 
-    // 2️⃣ Batch update all products to hide them
-    final batch = FirebaseFirestore.instance.batch();
-    for (var productDoc in productsSnapshot.docs) {
-      batch.update(productDoc.reference, {'isVisible': false});
+      final batch = FirebaseFirestore.instance.batch();
+      for (var productDoc in productsSnapshot.docs) {
+        batch.update(productDoc.reference, {'isVisible': false});
+      }
+
+      final sellerRef = FirebaseFirestore.instance.collection('sellers').doc(userId);
+      batch.update(sellerRef, {
+        'isLive': false,
+        'fbLiveLink': FieldValue.delete(),
+      });
+
+      await batch.commit();
+
+      if (!mounted) return;
+      setState(() {
+        _isLive = false;
+        _liveLinkController.clear();
+      });
+
+      debugPrint("✅ Live ended, all products hidden, and UI reset.");
+    } catch (e) {
+      debugPrint("❌ Error ending live: $e");
     }
-
-    // 3️⃣ Update seller live status in the same batch
-    final sellerRef = FirebaseFirestore.instance.collection('sellers').doc(userId);
-    batch.update(sellerRef, {
-      'isLive': false,
-      'fbLiveLink': FieldValue.delete(),
-    });
-
-    // 4️⃣ Commit all changes atomically
-    await batch.commit();
-
-    // 5️⃣ Reset local UI state immediately
-    if (!mounted) return;
-    setState(() {
-      _isLive = false;
-      _liveLinkController.clear();
-    });
-
-    debugPrint("✅ Live ended, all products hidden, and UI reset.");
-  } catch (e) {
-    debugPrint("❌ Error ending live: $e");
   }
-}
-
 
   Future<void> _showNow(Product product) async {
     await productController.updateProduct(product.id, {'isVisible': true});
@@ -154,10 +149,7 @@ Future<void> _endLiveAndHideAll() async {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          "Live Product Control",
-          style: TextStyle(color: Colors.black),
-        ),
+        title: const Text("Live Product Control", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         centerTitle: true,
         elevation: 0,
@@ -169,104 +161,62 @@ Future<void> _endLiveAndHideAll() async {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
-                  controller: _liveLinkController,
-                  decoration: const InputDecoration(
-                    labelText: 'Live Link',
-                    hintText: 'https://facebook.com/yourpage/live',
+                    controller: _liveLinkController,
+                    decoration: InputDecoration(
+                      labelText: 'Live Link',
+                      hintText: 'https://facebook.com/yourpage/live',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.blue, width: 2),
+                      ),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 8),
                 Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: (!_isLive && !_isLoading)
-                              ? () async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text("Confirm Action"),
-                                      content: const Text("Do you want to go live?"),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context, false),
-                                          child: const Text("No"),
-                                        ),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.blueAccent,
-                                          ),
-                                          onPressed: () => Navigator.pop(context, true),
-                                          child: const Text("Yes"),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-
-                                  if (confirm == true) {
-                                    _goLive();
-                                  }
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Go Live Now'),
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: (!_isLive && !_isLoading) ? _goLive : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          foregroundColor: Colors.white,
                         ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Go Live Now'),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _isLive
-                              ? () async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text("Confirm Action"),
-                                      content: const Text("Do you want to end live?"),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context, false),
-                                          child: const Text("No"),
-                                        ),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                          ),
-                                          onPressed: () => Navigator.pop(context, true),
-                                          child: const Text("Yes"),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-
-                                  if (confirm == true) {
-                                    _endLiveAndHideAll();
-                                  }
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('End Live'),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLive ? _endLiveAndHideAll : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
                         ),
+                        child: const Text('End Live'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
                 const Divider(height: 32),
               ],
             ),
@@ -276,27 +226,15 @@ Future<void> _endLiveAndHideAll() async {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  searchQuery = value.toLowerCase();
-                });
-              },
+              onChanged: (value) => setState(() => searchQuery = value.toLowerCase()),
               decoration: InputDecoration(
                 hintText: "Search product...",
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 filled: true,
                 fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: const OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.blue),
                 ),
               ),
             ),
@@ -317,12 +255,7 @@ Future<void> _endLiveAndHideAll() async {
                 }).toList();
 
                 if (filteredProducts.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      "No products found",
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  );
+                  return const Center(child: Text("No products found", style: TextStyle(fontSize: 16, color: Colors.grey)));
                 }
 
                 return ListView.separated(
@@ -359,20 +292,19 @@ Future<void> _endLiveAndHideAll() async {
                                     width: double.infinity,
                                     height: 160,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        const Icon(Icons.broken_image, size: 40),
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 40),
                                   )
                                 : Container(
                                     width: double.infinity,
                                     height: 160,
                                     color: Colors.grey.shade200,
-                                    child: const Icon(Icons.image_not_supported,
-                                        size: 40, color: Colors.grey),
+                                    child: const Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
                                   ),
                           ),
                           const SizedBox(height: 8),
 
                           // Name & Price
+                                                    // Name & Price
                           Text(
                             p.name,
                             style: const TextStyle(
@@ -398,9 +330,7 @@ Future<void> _endLiveAndHideAll() async {
                                 inStock ? "in stock" : "out of stock",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: inStock
-                                      ? Colors.green
-                                      : Colors.redAccent,
+                                  color: inStock ? Colors.green : Colors.redAccent,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -429,10 +359,7 @@ Future<void> _endLiveAndHideAll() async {
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    shadowColor: (!isVisible && inStock)
-                                        ? Colors.blueAccent
-                                        : Colors.transparent,
-                                    elevation: (!isVisible && inStock) ? 6 : 0,
+                                    elevation: (_isLive && !isVisible && inStock) ? 6 : 0,
                                   ),
                                   onPressed: (_isLive && !isVisible && inStock)
                                       ? () => _showNow(p)
@@ -444,16 +371,11 @@ Future<void> _endLiveAndHideAll() async {
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isVisible
-                                        ? Colors.red
-                                        : Colors.grey.shade400,
+                                    backgroundColor: isVisible ? Colors.red : Colors.grey.shade400,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    shadowColor: isVisible
-                                        ? Colors.redAccent
-                                        : Colors.transparent,
                                     elevation: isVisible ? 6 : 0,
                                   ),
                                   onPressed: isVisible ? () => _hide(p) : null,

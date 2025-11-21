@@ -59,56 +59,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _isSaving = false);
   }
 
-  Future<void> _confirmPickImage() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Change Profile Picture"),
-        content: const Text("Do you want to select a new profile picture?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Yes, Change"),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await _pickImage();
-    }
-  }
-
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
-
-    // 🔹 Show confirmation dialog before saving
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Update Profile"),
-        content: const Text("Are you sure you want to update your profile?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Yes, Update"),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
 
     setState(() => _isSaving = true);
 
@@ -119,7 +72,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           .update({
         'firstName': _firstName,
         'lastName': _lastName,
-        'email': _email,
+        // 🚫 email not updated here
         'profileImageUrl': _profileImageUrl,
       });
 
@@ -142,10 +95,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      filled: true,
-      fillColor: Colors.grey.shade50,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: const OutlineInputBorder(),
     );
   }
 
@@ -166,29 +116,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Profile Avatar with confirmation
                     GestureDetector(
-                      onTap: _confirmPickImage,
-                      child: Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          CircleAvatar(
-                            radius: 55,
-                            backgroundImage: _profileImageUrl != null
-                                ? NetworkImage(_profileImageUrl!)
-                                : const AssetImage('lib/assets/default_avatar.png')
-                                    as ImageProvider,
-                          ),
-                          Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.blueAccent,
-                              shape: BoxShape.circle,
-                            ),
-                            padding: const EdgeInsets.all(6),
-                            child: const Icon(Icons.camera_alt,
-                                color: Colors.white, size: 20),
-                          ),
-                        ],
+                      onTap: _pickImage,
+                      child: CircleAvatar(
+                        radius: 55,
+                        backgroundImage: _profileImageUrl != null
+                            ? NetworkImage(_profileImageUrl!)
+                            : const AssetImage('lib/assets/default_avatar.png')
+                                as ImageProvider,
                       ),
                     ),
                     const SizedBox(height: 30),
@@ -197,18 +132,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     TextFormField(
                       initialValue: _firstName,
                       decoration: _inputDecoration("First Name"),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return "Enter first name";
-                        }
-                        if (v.length < 2) {
-                          return "Must be at least 2 characters";
-                        }
-                        if (!RegExp(r"^[a-zA-Z]+$").hasMatch(v)) {
-                          return "Only letters allowed";
-                        }
-                        return null;
-                      },
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? "Enter first name" : null,
                       onSaved: (v) => _firstName = v!.trim(),
                     ),
                     const SizedBox(height: 20),
@@ -217,58 +142,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     TextFormField(
                       initialValue: _lastName,
                       decoration: _inputDecoration("Last Name"),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return "Enter last name";
-                        }
-                        if (!RegExp(r"^[a-zA-Z]+$").hasMatch(v)) {
-                          return "Only letters allowed";
-                        }
-                        return null;
-                      },
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? "Enter last name" : null,
                       onSaved: (v) => _lastName = v!.trim(),
                     ),
                     const SizedBox(height: 20),
 
-                    // Email
+                    // Email (read-only)
                     TextFormField(
                       initialValue: _email,
+                      enabled: false, // 🚫 disables editing
                       decoration: _inputDecoration("Email"),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return "Enter email";
-                        }
-                        if (!RegExp(r'^[\w.-]+@([\w-]+\.)+[a-zA-Z]{2,}$')
-                            .hasMatch(v)) {
-                          return "Enter a valid email";
-                        }
-                        return null;
-                      },
-                      onSaved: (v) => _email = v!.trim(),
                     ),
                     const SizedBox(height: 30),
 
-                    // Save Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _saveProfile,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.blueAccent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
-                        ),
-                        child: const Text(
-                          "Save Changes",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: const Text("Save Changes"),
                       ),
                     ),
                   ],

@@ -30,7 +30,7 @@ class TopSellingTile extends StatelessWidget {
     final isDeleted = name == null || name!.isEmpty;
 
     return Container(
-      width: 150, // 👈 narrower card
+      width: 150,
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
@@ -48,6 +48,7 @@ class TopSellingTile extends StatelessWidget {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min, // ✅ shrink to fit children
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Rank badge
@@ -70,7 +71,7 @@ class TopSellingTile extends StatelessWidget {
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 13, // smaller
+                fontSize: 13,
               ),
             ),
           ),
@@ -79,7 +80,7 @@ class TopSellingTile extends StatelessWidget {
 
           // Product image or placeholder
           CircleAvatar(
-            radius: 26, // 👈 smaller avatar
+            radius: 26,
             backgroundColor: _rankColor().withOpacity(0.15),
             backgroundImage: (!isDeleted && imageUrl != null && imageUrl!.isNotEmpty)
                 ? NetworkImage(imageUrl!)
@@ -99,10 +100,10 @@ class TopSellingTile extends StatelessWidget {
               isDeleted ? "—" : name!,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                fontSize: 13, // 👈 smaller font
+                fontSize: 13,
                 color: isDeleted ? Colors.grey : Colors.black,
               ),
-              maxLines: 2, // 👈 allow 2 lines
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
@@ -115,14 +116,14 @@ class TopSellingTile extends StatelessWidget {
             Text(
               "Sold: $sold",
               style: TextStyle(
-                fontSize: 11, // 👈 smaller
+                fontSize: 11,
                 color: Colors.grey.shade600,
               ),
             ),
             Text(
               "₱${revenue?.toStringAsFixed(2) ?? '0.00'}",
               style: const TextStyle(
-                fontSize: 13, // 👈 smaller
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: Colors.green,
               ),
@@ -133,7 +134,7 @@ class TopSellingTile extends StatelessWidget {
               style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height:3),
         ],
       ),
     );

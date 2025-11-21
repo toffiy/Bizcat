@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class EditProductDialog extends StatefulWidget {
   final String initialName;
   final int initialQty;
-  final double initialPrice;
-  final Future<void> Function(String name, int qty, double price) onSubmit;
+  final int initialPrice; // 🔹 price as int since whole numbers only
+  final Future<void> Function(String name, int qty, int price) onSubmit;
 
   const EditProductDialog({
     super.key,
@@ -18,8 +19,8 @@ class EditProductDialog extends StatefulWidget {
     BuildContext context, {
     required String name,
     required int qty,
-    required double price,
-    required Future<void> Function(String, int, double) onSubmit,
+    required int price,
+    required Future<void> Function(String, int, int) onSubmit,
   }) {
     return showDialog(
       context: context,
@@ -54,19 +55,19 @@ class _EditProductDialogState extends State<EditProductDialog> {
   void _handleSave() async {
     final name = _nameController.text.trim();
     final qty = int.tryParse(_qtyController.text) ?? -1;
-    final price = double.tryParse(_priceController.text) ?? -1.0;
+    final price = int.tryParse(_priceController.text) ?? -1;
 
     // Validation
     if (name.isEmpty) {
       setState(() => _errorMessage = "Product name cannot be empty");
       return;
     }
-    if (qty < 0) { // ✅ allows 0, blocks negatives
-      setState(() => _errorMessage = "Quantity cannot be negative");
+    if (qty < 0) {
+      setState(() => _errorMessage = "Quantity must be a whole number ≥ 0");
       return;
     }
-    if (price < 0) { // ✅ allows 0.0, blocks negatives
-      setState(() => _errorMessage = "Price cannot be negative");
+    if (price < 0) {
+      setState(() => _errorMessage = "Price must be a whole number ≥ 0");
       return;
     }
 
@@ -98,6 +99,9 @@ class _EditProductDialogState extends State<EditProductDialog> {
           TextField(
             controller: _qtyController,
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9]')), // ✅ only digits allowed
+            ],
             decoration: const InputDecoration(
               labelText: "Quantity",
               border: OutlineInputBorder(),
@@ -107,6 +111,9 @@ class _EditProductDialogState extends State<EditProductDialog> {
           TextField(
             controller: _priceController,
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9]')), // ✅ only digits allowed
+            ],
             decoration: const InputDecoration(
               labelText: "Price",
               border: OutlineInputBorder(),

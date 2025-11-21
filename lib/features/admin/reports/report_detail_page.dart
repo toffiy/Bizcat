@@ -5,16 +5,11 @@ import '../sellers/seller_detail_page.dart';
 import '../sellers/buyer_detail_page.dart';
 
 class ReportDetailsPage extends StatefulWidget {
-  final String reportId;
-  final String userId; // sellerId or buyerId
-  final String role;   // "Seller" or "Buyer"
+  final String reportPath; // 🔹 full Firestore path to the report document
 
-  // ❌ remove const, because arguments are runtime values
   ReportDetailsPage({
     super.key,
-    required this.reportId,
-    required this.userId,
-    required this.role,
+    required this.reportPath,
   });
 
   @override
@@ -23,6 +18,22 @@ class ReportDetailsPage extends StatefulWidget {
 
 class _ReportDetailsPageState extends State<ReportDetailsPage> {
   bool actionTaken = false;
+
+  String getRoleFromPath() {
+    return widget.reportPath.contains('/sellers/') ? 'Seller' : 'Buyer';
+  }
+
+  String getUserIdFromPath() {
+    final segments = widget.reportPath.split('/');
+    // path looks like: sellers/{userId}/reports/{reportId}
+    // or buyers/{userId}/reports/{reportId}
+    return segments.length >= 2 ? segments[1] : '';
+  }
+
+  String getReportIdFromPath() {
+    final segments = widget.reportPath.split('/');
+    return segments.isNotEmpty ? segments.last : '';
+  }
 
   Future<void> _confirmAndUpdateStatus(
     BuildContext context,
@@ -49,12 +60,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
 
     if (confirmed == true) {
-      final reportRef = FirebaseFirestore.instance
-          .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
-          .doc(widget.userId)
-          .collection('reports')
-          .doc(widget.reportId);
-
+      final reportRef = FirebaseFirestore.instance.doc(widget.reportPath);
       final reportSnap = await reportRef.get();
       final reportData = reportSnap.data() as Map<String, dynamic>? ?? {};
       final reason = reportData['reason'] ?? 'No reason provided';
@@ -62,18 +68,15 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
       await reportRef.update({'reviewStatus': newStatus});
 
       if (newStatus == "send_warning") {
-        final notificationsRef = FirebaseFirestore.instance
-            .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
-            .doc(widget.userId)
-            .collection('notifications');
-
-        await notificationsRef.add({
+        await reportRef.parent.parent!
+            .collection('notifications')
+            .add({
           'type': newStatus,
           'title': "Account Warning",
           'message':
               "Your account has received a warning due to: $reason. Please review and take corrective action.",
           'reason': reason,
-          'reportId': widget.reportId,
+          'reportId': getReportIdFromPath(),
           'createdAt': FieldValue.serverTimestamp(),
           'read': false,
         });
@@ -112,35 +115,30 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
 
     if (confirmed == true) {
-      await FirebaseFirestore.instance
-          .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
-          .doc(widget.userId)
-          .collection('reports')
-          .doc(widget.reportId)
-          .update({'reviewStatus': 'suspend_account'});
-
-      await FirebaseFirestore.instance
-          .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
-          .doc(widget.userId)
-          .update({'status': 'suspended'});
+      final reportRef = FirebaseFirestore.instance.doc(widget.reportPath);
+      await reportRef.update({'reviewStatus': 'suspend_account'});
+      await reportRef.parent.parent!.update({'status': 'suspended'});
 
       if (!mounted) return;
       setState(() {
         actionTaken = true;
       });
 
-      if (widget.role == 'Seller') {
+      final role = getRoleFromPath();
+      final userId = getUserIdFromPath();
+
+      if (role == 'Seller') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => SellerDetailPage(sellerId: widget.userId),
+            builder: (_) => SellerDetailPage(sellerId: userId),
           ),
         );
       } else {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => BuyerDetailPage(buyerId: widget.userId),
+            builder: (_) => BuyerDetailPage(buyerId: userId),
           ),
         );
       }
@@ -149,11 +147,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final reportRef = FirebaseFirestore.instance
-        .collection(widget.role == 'Seller' ? 'sellers' : 'buyers')
-        .doc(widget.userId)
-        .collection('reports')
-        .doc(widget.reportId);
+    final reportRef = FirebaseFirestore.instance.doc(widget.reportPath);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Report Details")),
@@ -168,21 +162,9 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          final sellerName =
-              "${data['sellerFirstName'] ?? ''} ${data['sellerLastName'] ?? ''}".trim();
+          final name = data['name'] ?? 'Unknown User';
           final reason = data['reason'] ?? 'No reason';
           final description = data['description'] ?? 'No description';
-
-          String buyerName = "Unknown Buyer";
-          if (data.containsKey('buyerFirstName') ||
-              data.containsKey('buyerLastName')) {
-            buyerName =
-                "${data['buyerFirstName'] ?? ''} ${data['buyerLastName'] ?? ''}".trim();
-          } else if (data['buyerName'] != null) {
-            buyerName = data['buyerName'];
-          }
-          final buyerEmail = data['buyerEmail'] ?? 'No email';
-
           final reviewStatus = data['reviewStatus'] ?? 'under_review';
           final evidence = List<String>.from(data['evidence'] ?? []);
 
@@ -226,15 +208,13 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                   child: ListTile(
                     leading: const Icon(Icons.store, color: Colors.blue),
                     title: Text(
-                      sellerName.isEmpty ? "Unknown User" : sellerName,
+                      name,
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Buyer Name: $buyerName"),
-                        Text("Buyer Email: $buyerEmail"),
                         Text("Time: $createdAtStr"),
                         Text(
                           "Status: $statusLabel",
@@ -276,42 +256,15 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                     height: 160,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                                            children: evidence.map((url) {
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => Scaffold(
-                                  backgroundColor: Colors.black,
-                                  body: GestureDetector(
-                                    onTap: () => Navigator.pop(context),
-                                    child: Center(
-                                      child: Hero(
-                                        tag: url,
-                                        child: Image.network(
-                                          url,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          child: Hero(
-                            tag: url,
-                            child: Padding(
-                              padding: const EdgeInsets.all(6.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  url,
-                                  width: 160,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                      children: evidence.map((url) {
+                        return Padding(
+                          padding: const EdgeInsets.all(6.0),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              url,
+                              width: 160,
+                              fit: BoxFit.cover,
                             ),
                           ),
                         );
@@ -322,9 +275,8 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
 
                 const SizedBox(height: 32),
 
-                // 🔹 Action buttons
                 if (reviewStatus == 'under_review') ...[
-                  ElevatedButton.icon(
+                                    ElevatedButton.icon(
                     onPressed: () => _confirmAndUpdateStatus(
                       context,
                       'send_warning',
@@ -341,8 +293,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                   ElevatedButton.icon(
                     onPressed: () => _confirmEscalate(context),
                     icon: const Icon(Icons.person_off, color: Colors.white),
-                    // ⚠️ remove const here, widget.role is runtime
-                    label: Text("Suspend ${widget.role}"),
+                    label: Text("Suspend ${getRoleFromPath()}"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -376,5 +327,3 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
   }
 }
-
-                      

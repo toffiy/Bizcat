@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -93,6 +94,43 @@ class AdminDashboardPage extends StatelessWidget {
         .map((snap) => snap.size);
   }
 
+  /// ✅ Count suspended accounts (buyers + sellers)
+  Stream<int> _countSuspendedAccountsStream() {
+    final buyersStream = FirebaseFirestore.instance
+        .collection('buyers')
+        .where('status', isEqualTo: 'suspended')
+        .snapshots();
+
+    final sellersStream = FirebaseFirestore.instance
+        .collection('sellers')
+        .where('status', isEqualTo: 'suspended')
+        .snapshots();
+
+    final controller = StreamController<int>();
+    int buyersCount = 0;
+    int sellersCount = 0;
+
+    late final StreamSubscription buyersSub;
+    late final StreamSubscription sellersSub;
+
+    buyersSub = buyersStream.listen((snap) {
+      buyersCount = snap.size;
+      controller.add(buyersCount + sellersCount);
+    });
+
+    sellersSub = sellersStream.listen((snap) {
+      sellersCount = snap.size;
+      controller.add(buyersCount + sellersCount);
+    });
+
+    controller.onCancel = () {
+      buyersSub.cancel();
+      sellersSub.cancel();
+    };
+
+    return controller.stream;
+  }
+
   Widget _buildMetricCard({
     required String title,
     required String purpose,
@@ -186,7 +224,6 @@ class AdminDashboardPage extends StatelessWidget {
       },
     );
   }
-
   /// Sellers list
   Widget _buildAllSellersList() {
     return StreamBuilder<QuerySnapshot>(
@@ -402,6 +439,7 @@ Widget _buildSuspendedAccountsList() {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     return GridView.count(
@@ -426,14 +464,15 @@ Widget _buildSuspendedAccountsList() {
           color: Colors.green,
           dialogContent: _buildAllBuyersList(),
         ),
-        _buildMetricCard(
+              _buildMetricCard(
           title: "Suspended Accounts",
           purpose: "Accounts restricted due to violations",
           icon: Icons.block,
-          stream: _countDocs("sellers", "status", "suspended"),
+          stream: _countSuspendedAccountsStream(), // 👈 combined buyers + sellers stream
           color: Colors.red,
           dialogContent: _buildSuspendedAccountsList(),
         ),
+
         _buildMetricCard(
           title: "Recent Reports",
           purpose: "Latest customer reports submitted",

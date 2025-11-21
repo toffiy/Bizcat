@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/order.dart';
 
 class ClaimHistoryDesign {
-  /// Search bar widget
+  /// 🔍 Search bar widget
   static Widget buildSearchBar({
     required ValueChanged<String> onChanged,
   }) {
@@ -25,7 +25,7 @@ class ClaimHistoryDesign {
     );
   }
 
-  /// Bottom tab bar with status counts and notification badges
+  /// 📊 Bottom tab bar with status counts and notification badges
   static Widget buildTabBar({
     required int selectedIndex,
     required List<Map<String, dynamic>> tabs,
@@ -58,8 +58,7 @@ class ClaimHistoryDesign {
                       color: Colors.red,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    constraints:
-                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                     child: Text(
                       '$count',
                       style: const TextStyle(
@@ -79,7 +78,7 @@ class ClaimHistoryDesign {
     );
   }
 
-  /// Order card widget
+  /// 🛒 Order card widget
   static Widget buildOrderCard({
     required MyOrder order,
     required VoidCallback? onMarkPaid,
@@ -99,7 +98,7 @@ class ClaimHistoryDesign {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -171,7 +170,7 @@ class ClaimHistoryDesign {
               DateFormat('MM/dd/yyyy').format(order.timestamp)),
           const SizedBox(height: 6),
 
-          // 🔹 Seller Notes (if available)
+          // Seller Notes
           if (order.notes != null && order.notes!.isNotEmpty) ...[
             const Text("Seller Notes",
                 style: TextStyle(fontWeight: FontWeight.bold)),
@@ -226,13 +225,13 @@ class ClaimHistoryDesign {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (order.status.toLowerCase() != 'paid')
+              if (order.status.toLowerCase() == 'pending')
                 TextButton.icon(
                   icon: const Icon(Icons.attach_money, color: Colors.green),
                   label: const Text("Mark Paid"),
                   onPressed: onMarkPaid,
                 ),
-              if (order.status.toLowerCase() != 'shipped')
+              if (order.status.toLowerCase() == 'paid')
                 TextButton.icon(
                   icon: const Icon(Icons.local_shipping, color: Colors.blue),
                   label: const Text("Complete"),
@@ -270,7 +269,7 @@ class ClaimHistoryDesign {
     );
   }
 
-  /// Status color mapping
+  /// 🎨 Status color mapping
   static Color _statusColor(String? status) {
     switch (status?.toLowerCase()) {
       case 'pending':
@@ -286,7 +285,7 @@ class ClaimHistoryDesign {
     }
   }
 
-  /// Payment method color mapping
+  /// 💳 Payment method color mapping
   static Color _paymentColor(String? method) {
     switch (method?.toLowerCase()) {
       case 'gcash':

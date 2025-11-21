@@ -11,37 +11,65 @@ import '../presentation/profile_page.dart';
 import '../presentation/qr_generator_page.dart';
 import '../services/seller_service.dart';
 import '../presentation/blocked_screen.dart';
+import '../presentation/under_review_screen.dart';
 
 class DashboardController {
-  /// ----------------------
-  /// Monitor Seller Status
-  /// ----------------------
-  /// Call this in DashboardPage.initState()
-      void monitorSellerStatus(BuildContext context, String sellerId) {
-      FirebaseFirestore.instance
-          .collection('sellers')
-          .doc(sellerId)
-          .snapshots()
-          .listen((doc) {
-        if (doc.exists) {
-          final data = doc.data() as Map<String, dynamic>;
-          final status = data['status']; // ✅ matches your Firestore field
+  /// Expose reactive values for the UI
+  final ValueNotifier<String?> sellerStatus = ValueNotifier<String?>(null);
+  final ValueNotifier<int> reportCount = ValueNotifier<int>(0);
 
-          debugPrint("Seller status: $status"); // 👀 log to console for debugging
+  /// ----------------------
+  /// Monitor Seller Status & Reports
+  /// ----------------------
+  void monitorSellerStatus(BuildContext context, String sellerId) {
+    final sellerDoc =
+        FirebaseFirestore.instance.collection('sellers').doc(sellerId);
 
-          if (status == 'suspended') {
-            // Delay navigation until after build to avoid context issues
-            WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Listen to seller status
+    sellerDoc.snapshots().listen((doc) {
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final status = data['status'];
+        sellerStatus.value = status; // auto refresh via ValueNotifier
+
+        debugPrint("Seller status: $status");
+
+        if (status == 'suspended') {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const BlockedScreen()),
                 (route) => false,
               );
-            });
-          }
+            }
+          });
+        }
+      }
+    });
+
+    // Listen to reports count (only those without reviewStatus)
+    sellerDoc.collection('reports').snapshots().listen((querySnapshot) {
+    final docs = querySnapshot.docs;
+    final count = docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      return data['reviewStatus'] == null; // catches missing or null
+    }).length;
+
+    reportCount.value = count;
+    debugPrint("Reports without reviewStatus: $count");
+
+    if (count > 4) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const UnderReviewScreen()),
+            (route) => false,
+          );
         }
       });
     }
-
+  });
+  }
 
   /// ----------------------
   /// Handle Navigation
@@ -54,17 +82,14 @@ class DashboardController {
           MaterialPageRoute(builder: (_) => const ProductCatalogPage()),
         );
         break;
-
       case 'Customer List':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const CustomerListPage()),
         );
         break;
-
       case 'QR Code Generator':
         bool isNewAccount = true;
-
         SellerService.getSellerId().then((sellerId) {
           if (sellerId != null) {
             Navigator.push(
@@ -83,28 +108,24 @@ class DashboardController {
           }
         });
         break;
-
       case 'Claim History':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => claim.ClaimHistoryPage()),
         );
         break;
-
       case 'Sales Reports':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => sales.SalesReportPage()),
         );
         break;
-
       case 'Live Control':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const LiveControlPage()),
         );
         break;
-
       case 'Profile':
         Navigator.push(
           context,
